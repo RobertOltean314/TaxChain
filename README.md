@@ -5,7 +5,10 @@
 * MultiversX:
     - avantaje: fees foarte mici, foloseste Rust, documentatie multa
     - dezavantaje: nu la fel de mare precum ETH, nu sunt atat de multe tutoriale video
- 
+
+ ### Front-End Layer:
+
+ - React + Typescript (cel mai probabil)
   
 ### Core Concept
 A blockchain system that automates profit tax collection using quarterly business reports (the same data companies already provide to investors).
@@ -14,7 +17,7 @@ A blockchain system that automates profit tax collection using quarterly busines
 1. Government Registry
 - Multiple governments can register on the blockchain
 - Each sets their own profit tax brackets and rates
-- Example: 10% for profits ≤$50K, 15% for $50K-$200K, 20% for >$200K
+- Example: 10% for profits ≤$50K, 15% for >500K, 20% for >$1M.
 
 2. Business Registration
 - Companies register with their jurisdiction/government
@@ -34,3 +37,13 @@ A blockchain system that automates profit tax collection using quarterly busines
 5. Tax Distribution
 - Collected taxes automatically go to appropriate government wallets
 - Clear audit trail of all payments
+
+
+### Implementation Phases:
+Phase 1: Basic single-government, single-business proof of concept
+
+Phase 2: Multi-government registration system
+
+Phase 3: Full quarterly reporting and tax calculation
+
+Phase 4: Dashboard and reporting features
