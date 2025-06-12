@@ -40,10 +40,10 @@ A blockchain system that automates profit tax collection using quarterly busines
 
 
 ### Implementation Phases:
-Phase 1: Basic single-government, single-business proof of concept
+Phase 1: Basic single-government, single-business proof of concept, basic UI
 
-Phase 2: Multi-government registration system
+Phase 2: Multi-government registration system, UI enchancements
 
-Phase 3: Full quarterly reporting and tax calculation
+Phase 3: Full quarterly reporting and tax calculation, UI enchancements
 
-Phase 4: Dashboard and reporting features
+Phase 4: Dashboard and reporting features, UI enchancements
