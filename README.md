@@ -160,5 +160,3 @@ Each quarter, businesses upload two distinct reports:
 **Innovation Level**: Combines established technologies (blockchain, ZK proofs) with novel application (automated tax collection)
 
 ---
-
-*This project represents a brainstorming phase for a bachelor thesis exploring the intersection of blockchain technology, zero-knowledge cryptography, and public tax administration.*
