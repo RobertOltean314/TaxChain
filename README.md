@@ -36,7 +36,18 @@ Each quarter, businesses upload two distinct reports:
    - Transparent and auditable
 
 ---
+### Algorithmic Verification System
+**Zero-Discretion Compliance Checking**
 
+The system uses ZK proofs to verify that:
+- Internal transaction totals match external revenue reports
+- Expense calculations are consistent across both reports  
+- Declared profits equal (revenue - expenses) from internal data
+- **Result**: Binary pass/fail with no human interpretation required
+
+**Fraud Detection**: Automatic flagging of discrepancies without exposing sensitive transaction details.
+
+---
 ## 🔧 Key Components
 
 ### 1. Government Registry
@@ -139,17 +150,6 @@ Each quarter, businesses upload two distinct reports:
 **Frontend**: React + TypeScript  
 **ZK Proofs**: TBD (zk-SNARKs/zk-STARKs)  
 **Development**: Git, GitHub  
-
----
-
-## 📚 Next Steps
-
-- [ ] Literature review on ZK proofs in taxation
-- [ ] MultiversX development environment setup
-- [ ] Romanian tax law research (ANAF requirements)
-- [ ] ZK proof library evaluation
-- [ ] Technical specification document
-- [ ] Project timeline refinement
 
 ---
 
