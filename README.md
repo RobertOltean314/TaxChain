@@ -1,4 +1,48 @@
-# Blockchain-Based System for combating Tax Evansion in modern businesses
+# 🏛️ Blockchain-Based System for Combating Tax Evasion in Modern Businesses
+## Bachelor Thesis Project
+
+![Status](https://img.shields.io/badge/Status-Brainstorming%20%26%20Planning-yellow)
+![Blockchain](https://img.shields.io/badge/Blockchain-MultiversX-blue)
+![ZK Proofs](https://img.shields.io/badge/Privacy-Zero%20Knowledge-green)
+![License](https://img.shields.io/badge/License-Academic-orange)
+
+> **🎯 Mission**: Revolutionizing tax compliance through automated profit tax collection with privacy-preserving Zero-Knowledge proofs  
+> **🌍 Impact**: Reducing tax evasion while protecting business privacy and eliminating human corruption
+
+---
+
+## 📋 Table of Contents
+- [🎯 Core Concept](#-core-concept)
+- [🚨 Problem Statement](#-problem-statement)
+- [💡 Solution](#-solution)
+- [🏗️ Technical Architecture](#️-technical-architecture)
+- [🔧 Key Components](#-key-components)
+- [🚀 Implementation Roadmap](#-implementation-roadmap)
+- [🔬 Research Areas](#-research-areas)
+- [🛠️ Technology Stack](#️-technology-stack)
+- [🎓 Academic Context](#-academic-context)
+
+---
+
+## 🚨 Problem Statement
+
+**Current Tax Collection Challenges:**
+- 📈 **Tax Evasion**: Businesses underreport profits, costing governments billions annually
+- 🔍 **Privacy Concerns**: Companies reluctant to expose sensitive financial data during audits
+- 🤝 **Trust Issues**: Potential for corruption in manual verification processes
+- ⏱️ **Inefficiency**: Manual tax collection and verification processes are slow and error-prone
+- 📊 **Inconsistency**: Different reporting standards create loopholes and confusion
+
+---
+
+## 💡 Solution
+
+**A trustless, automated tax system that:**
+- ✅ **Eliminates Human Bias**: Algorithmic verification removes corruption possibilities
+- 🔐 **Preserves Privacy**: Zero-Knowledge proofs verify compliance without exposing transactions
+- ⚡ **Automates Collection**: Smart contracts handle calculations and transfers instantly
+- 📊 **Leverages Existing Data**: Uses quarterly investor reports companies already produce
+- 🌐 **Scales Globally**: Multi-government support with customizable tax brackets
 
 ---
 
@@ -36,18 +80,7 @@ Each quarter, businesses upload two distinct reports:
    - Transparent and auditable
 
 ---
-### Algorithmic Verification System
-**Zero-Discretion Compliance Checking**
 
-The system uses ZK proofs to verify that:
-- Internal transaction totals match external revenue reports
-- Expense calculations are consistent across both reports  
-- Declared profits equal (revenue - expenses) from internal data
-- **Result**: Binary pass/fail with no human interpretation required
-
-**Fraud Detection**: Automatic flagging of discrepancies without exposing sensitive transaction details.
-
----
 ## 🔧 Key Components
 
 ### 1. Government Registry
@@ -153,10 +186,46 @@ The system uses ZK proofs to verify that:
 
 ---
 
+## 📚 Next Steps
+
+- [ ] Literature review on ZK proofs in taxation
+- [ ] MultiversX development environment setup
+- [ ] Romanian tax law research (ANAF requirements)
+- [ ] ZK proof library evaluation
+- [ ] Technical specification document
+- [ ] Project timeline refinement
+
+---
+
 ## 🎓 Academic Context
 
 **Thesis Type**: Bachelor's Degree  
 **Focus Areas**: Blockchain Technology, Cryptography, Public Policy, Software Engineering  
 **Innovation Level**: Combines established technologies (blockchain, ZK proofs) with novel application (automated tax collection)
+
+---
+
+## 🤝 Contributing & Collaboration
+
+This is an academic research project, but feedback and suggestions are welcome!
+
+
+## 📜 License & Academic Use
+
+This project is developed for academic purposes as part of a Bachelor's thesis. 
+
+**Academic Citation:**
+```
+Oltean Robert. "Blockchain-Based System for Combating Tax Evasion in Modern Businesses." 
+Bachelor's Thesis, University of "Lucian Blaga" Sibiu, 2026.
+```
+
+---
+
+## 🙏 Acknowledgments
+
+- MultiversX Foundation for blockchain infrastructure
+- Zero-Knowledge cryptography research community
+- University of "Lucian Blaga" Sibiu Computer Science Department
 
 ---
