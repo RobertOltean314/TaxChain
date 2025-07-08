@@ -2,29 +2,9 @@
 
 ## Bachelor Thesis Project
 
-![Status](https://img.shields.io/badge/Status-Brainstorming%20%26%20Planning-yellow)
 ![Blockchain](https://img.shields.io/badge/Blockchain-MultiversX-blue)
 ![ZK Proofs](https://img.shields.io/badge/Privacy-Zero%20Knowledge-green)
 ![License](https://img.shields.io/badge/License-Academic-orange)
-
-> **🎯 Mission**: Revolutionizing tax compliance through automated profit tax collection with privacy-preserving Zero-Knowledge proofs  
-> **🌍 Impact**: Reducing tax evasion while protecting business privacy and eliminating human corruption
-
----
-
-## 📋 Table of Contents
-
-- [🎯 Core Concept](#-core-concept)
-- [🚨 Problem Statement](#-problem-statement)
-- [💡 Solution](#-solution)
-- [🏗️ Technical Architecture](#️-technical-architecture)
-- [🔧 Key Components](#-key-components)
-- [🚀 Implementation Roadmap](#-implementation-roadmap)
-- [🔬 Research Areas](#-research-areas)
-- [🛠️ Technology Stack](#️-technology-stack)
-- [🎓 Academic Context](#-academic-context)
-
----
 
 ## 🚨 What is wrong with the way we do business nowadays?
 
