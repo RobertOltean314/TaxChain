@@ -1,4 +1,5 @@
 # 🏛️ Blockchain-Based System for Combating Tax Evasion in Modern Businesses
+
 ## Bachelor Thesis Project
 
 ![Status](https://img.shields.io/badge/Status-Brainstorming%20%26%20Planning-yellow)
@@ -12,6 +13,7 @@
 ---
 
 ## 📋 Table of Contents
+
 - [🎯 Core Concept](#-core-concept)
 - [🚨 Problem Statement](#-problem-statement)
 - [💡 Solution](#-solution)
@@ -24,25 +26,27 @@
 
 ---
 
-## 🚨 Problem Statement
+## 🚨 What is wrong with the way we do business nowadays?
 
-**Current Tax Collection Challenges:**
-- 📈 **Tax Evasion**: Businesses underreport profits, costing governments billions annually
-- 🔍 **Privacy Concerns**: Companies reluctant to expose sensitive financial data during audits
-- 🤝 **Trust Issues**: Potential for corruption in manual verification processes
-- ⏱️ **Inefficiency**: Manual tax collection and verification processes are slow and error-prone
-- 📊 **Inconsistency**: Different reporting standards create loopholes and confusion
+The digital transformation of commerce and the shift away from traditional monetary systems have fundamentally altered how businesses operate and interact with regulatory frameworks. However, these changes have exposed critical inefficiencies in government oversight and tax collection systems, creating concerns among technology professionals and policy experts alike.
+The modern economy faces several systemic challenges that demand innovative solutions:
+
+- 📈 **Tax Evasion and Misreporting**: Businesses frequently manipulate financial statements by underreporting profits and inflating expenses to minimize tax obligations. This widespread practice costs governments billions of dollars annually in lost revenue, ultimately forcing higher tax rates and increased inflation that disproportionately burden ordinary citizens and compliant businesses.
+- 🏛️ **Inefficient Tax Collection Infrastructure:**: Traditional tax authorities in most countries rely on outdated bureaucratic systems that require extensive human resources and manual processes. These agencies could be streamlined through automated systems managed by small teams of specialized engineers, significantly reducing operational costs while improving collection efficiency and freeing up government resources for critical investments in infrastructure, education, healthcare, and innovation.
+- 🔒 **Data Privacy Vulnerabilities**: Current audit processes force businesses to surrender sensitive financial information to demonstrate compliance, creating security risks and exposing proprietary data to potential misuse.
 
 ---
 
 ## 💡 Solution
 
-**A trustless, automated tax system that:**
-- ✅ **Eliminates Human Bias**: Algorithmic verification removes corruption possibilities
-- 🔐 **Preserves Privacy**: Zero-Knowledge proofs verify compliance without exposing transactions
-- ⚡ **Automates Collection**: Smart contracts handle calculations and transfers instantly
-- 📊 **Leverages Existing Data**: Uses quarterly investor reports companies already produce
-- 🌐 **Scales Globally**: Multi-government support with customizable tax brackets
+The emergence of blockchain technology and cryptographic advancements presents an opportunity to revolutionize tax collection systems. By implementing a decentralized, automated approach, we can address the fundamental issues plaguing traditional tax frameworks while maintaining transparency and accountability.
+The proposed solution addresses each identified problem through technological innovation:
+
+- ✅ **Algorithmic Verification**: Automated systems eliminate human bias and corruption possibilities in tax assessment and collection. This ensures consistent application of tax laws across all businesses, reducing disputes and creating a more equitable system for taxpayers and governments alike.
+- 🔐 **Zero-Knowledge Privacy Protection**: Implementation of Zero-Knowledge proof algorithms allows businesses to verify tax compliance without exposing sensitive transaction data. This maintains competitive advantages while ensuring regulatory compliance, eliminating the current trade-off between privacy and transparency.
+- ⚡ **Smart Contract Automation:**: Automated calculation and transfer systems handle tax collection instantly upon transaction completion. This reduces administrative overhead, eliminates collection delays, and ensures governments receive tax revenue in real-time rather than waiting for quarterly or annual filings.
+- 📊 **Integration with Existing Infrastructure:**: The system requires businesses to upload cryptographic proofs of invoices directly onto the blockchain. This creates an immutable record of all transactions while leveraging existing invoice generation processes that companies already use. This approach minimizes implementation friction and reduces additional compliance burdens on businesses while ensuring complete transaction transparency and traceability.
+- 🌐 **Scales Globally**: Customizable tax brackets and rules accommodate different jurisdictions and tax systems. This enables international businesses to operate seamlessly across borders while ensuring each government receives appropriate tax revenue according to their specific requirements.
 
 ---
 
@@ -53,22 +57,27 @@ A blockchain system that automates profit tax collection using quarterly busines
 ## 🏗️ Technical Architecture
 
 ### Blockchain Layer
+
 **MultiversX**
-- ✅ **Advantages**: 
+
+- ✅ **Advantages**:
   - Very low transaction fees
   - Built with Rust (performance & security)
   - Extensive documentation
 
 ### Frontend Layer
+
 - **React + TypeScript** (primary choice)
 - Modern, responsive UI for businesses and tax authorities
 
 ### Zero-Knowledge Proof Layer
+
 **Privacy-Preserving Tax Compliance**
 
 Each quarter, businesses upload two distinct reports:
 
 1. **Internal Report ("Bilanț Contabil")**
+
    - Contains all internal transactions
    - Processed through ZK proof algorithm
    - Verified by tax authority (ANAF for Romania)
@@ -84,36 +93,42 @@ Each quarter, businesses upload two distinct reports:
 ## 🔧 Key Components
 
 ### 1. Government Registry
+
 - Multiple governments can register on the blockchain
 - Each sets their own profit tax brackets and rates
 - **Example Structure**:
   - 10% for profits ≤ $50K
-  - 15% for profits > $50K ≤ $500K  
+  - 15% for profits > $50K ≤ $500K
   - 20% for profits > $1M
 
 ### 2. Business Registration
+
 - Companies register with their jurisdiction/government
 - Link to their government's tax bracket system
 - Store business metadata and tax obligations
 
 ### 3. Quarterly Reporting System
+
 - Businesses submit profit data from quarterly investor reports
 - Leverages existing legally required investor reporting
 - **Anti-fraud mechanism**: Reduces tax evasion since lying to investors has severe legal consequences
 
 ### 4. Automated Tax Calculation
+
 - Smart contracts apply progressive tax brackets to reported profits
 - Automatic calculation and collection each quarter
 - Transparent, immutable tax records
 
 ### 5. Tax Distribution
+
 - Collected taxes automatically transferred to appropriate government wallets
 - Complete audit trail of all payments
 - Real-time transparency for public funds
 
 ### 6. Zero-Knowledge Verification Layer
+
 - **Privacy Goal**: Verify tax compliance without exposing sensitive business data
-- **Process**: 
+- **Process**:
   1. Business generates ZK proof of internal report validity
   2. Tax authority (ANAF) verifies proof without seeing raw data
   3. Approval/rejection based on cryptographic verification
@@ -124,22 +139,26 @@ Each quarter, businesses upload two distinct reports:
 ## 🚀 Implementation Roadmap
 
 ### Phase 1: Foundation
+
 - [ ] Basic single-government, single-business proof of concept
 - [ ] Core smart contracts on MultiversX
 - [ ] Basic React UI
 - [ ] Simple tax calculation logic
 
 ### Phase 2: Multi-Entity Support
+
 - [ ] Multi-government registration system
 - [ ] Enhanced business onboarding
 - [ ] UI improvements and government dashboard
 
 ### Phase 3: Full Automation
+
 - [ ] Complete quarterly reporting system
 - [ ] Automated tax calculation and collection
 - [ ] Advanced UI features
 
 ### Phase 4: Zero-Knowledge Integration
+
 - [ ] ZK proof system implementation
 - [ ] ANAF integration simulation
 - [ ] Privacy-preserving verification
@@ -150,17 +169,20 @@ Each quarter, businesses upload two distinct reports:
 ## 🔬 Research Areas
 
 ### Technical Challenges
+
 - **ZK Proof System Selection**: zk-SNARKs vs zk-STARKs vs other protocols
 - **MultiversX ZK Capabilities**: Native support vs external implementation
 - **Romanian "Bilanț Contabil" Standardization**: Data structure for ZK processing
 - **Computational Overhead**: Efficient proof generation for complex reports
 
 ### Legal & Regulatory
+
 - **Blockchain vs Traditional Tax Law**: Legal framework compatibility
 - **Data Privacy Compliance**: GDPR and Romanian regulations
 - **Audit Trail Requirements**: Regulatory acceptance of blockchain records
 
 ### Practical Implementation
+
 - **Government Integration**: Simulation vs real ANAF connectivity
 - **Dispute Resolution**: Handling ZK proof failures or challenges
 - **Data Integrity**: Ensuring report authenticity before ZK processing
@@ -182,7 +204,7 @@ Each quarter, businesses upload two distinct reports:
 **Smart Contracts**: Rust  
 **Frontend**: React + TypeScript  
 **ZK Proofs**: TBD (zk-SNARKs/zk-STARKs)  
-**Development**: Git, GitHub  
+**Development**: Git, GitHub
 
 ---
 
@@ -209,14 +231,14 @@ Each quarter, businesses upload two distinct reports:
 
 This is an academic research project, but feedback and suggestions are welcome!
 
-
 ## 📜 License & Academic Use
 
-This project is developed for academic purposes as part of a Bachelor's thesis. 
+This project is developed for academic purposes as part of a Bachelor's thesis.
 
 **Academic Citation:**
+
 ```
-Oltean Robert. "Blockchain-Based System for Combating Tax Evasion in Modern Businesses." 
+Oltean Robert. "Blockchain-Based System for Combating Tax Evasion in Modern Businesses."
 Bachelor's Thesis, University of "Lucian Blaga" Sibiu, 2026.
 ```
 
