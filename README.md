@@ -19,16 +19,15 @@ The modern economy faces several systemic challenges that demand innovative solu
 
 ---
 
-## Solution
+## Solution: A Blockchain-Based Tax Framework
 
-The emergence of blockchain technology and cryptographic advancements presents an opportunity to revolutionize tax collection systems. By implementing a decentralized, automated approach, we can address the fundamental issues plaguing traditional tax frameworks while maintaining transparency and accountability.
-The proposed solution addresses each identified problem through technological innovation:
+The emergence of blockchain technology and cryptographic innovations offers a transformative path toward solving many of the inefficiencies in modern tax systems. A decentralized, automated approach not only enhances transparency and accountability but also streamlines compliance and reduces administrative overhead. The following components outline a potential architecture for a modern, blockchain-enabled tax infrastructure:
 
-- **Algorithmic Verification**: Automated systems eliminate human bias and corruption possibilities in tax assessment and collection. This ensures consistent application of tax laws across all businesses, reducing disputes and creating a more equitable system for taxpayers and governments alike.
-- **Zero-Knowledge Privacy Protection**: Implementation of Zero-Knowledge proof algorithms allows businesses to verify tax compliance without exposing sensitive transaction data. This maintains competitive advantages while ensuring regulatory compliance, eliminating the current trade-off between privacy and transparency.
-- **Smart Contract Automation**: Automated calculation and transfer systems handle tax collection instantly upon transaction completion. This reduces administrative overhead, eliminates collection delays, and ensures governments receive tax revenue in real-time rather than waiting for quarterly or annual filings.
-- **Integration with Existing Infrastructure**: The system requires businesses to upload cryptographic proofs of invoices directly onto the blockchain. This creates an immutable record of all transactions while leveraging existing invoice generation processes that companies already use. This approach minimizes implementation friction and reduces additional compliance burdens on businesses while ensuring complete transaction transparency and traceability.
-- **Scales Globally**: Customizable tax brackets and rules accommodate different jurisdictions and tax systems. This enables international businesses to operate seamlessly across borders while ensuring each government receives appropriate tax revenue according to their specific requirements.
+- **Algorithmic Verification and Fairness**: By using algorithms to assess and verify tax obligations, human bias and corruption risks in tax administration can be minimized. These systems ensure uniform enforcement of tax laws, reducing legal disputes and increasing trust among taxpayers and authorities[^algorithms].
+- **Zero-Knowledge Privacy Protection**: With the adoption of zero-knowledge proof (ZKP) systems, businesses can prove their compliance with tax regulations without disclosing sensitive financial details. This preserves data confidentiality while ensuring regulatory adherence — solving the long-standing conflict between privacy and transparency[^zkp-paper][^zkp-nyt].
+- **Smart Contract Automation**: Smart contracts enable real-time calculation, withholding, and transfer of taxes at the moment a transaction occurs. This eliminates the need for quarterly or annual filings, reduces administrative delays, and ensures governments receive tax revenue more efficiently[^smart-tax].
+- **Integration with Existing Infrastructure**: Businesses would generate cryptographic proofs of invoices and submit them to the blockchain, creating a much efficient auditable record of all taxable events. Since this process can be layered onto existing ERP and invoicing systems, it significantly reduces adoption barriers while enhancing auditability[^blockchain-invoice].
+- **Scales Globally**: The system can be configured with jurisdiction-specific rules and tax brackets, enabling seamless cross-border operations for multinational corporations. Each nation retains sovereignty over its taxation model, while the underlying system ensures accurate distribution and compliance[^imf-digital-tax].
 
 ---
 
@@ -67,9 +66,14 @@ Bachelor's Thesis, University of "Lucian Blaga" Sibiu, 2026.
 
 ## Index
 
-[^investopedia]: Chen, J. (2023). _How to spot financial statement manipulation_. Investopedia. https://www.investopedia.com/articles/fundamental-analysis/financial-statement-manipulation.asp
-[^jsheld]: Sheld, J. (2022). _Impact of economic uncertainty on financial statement manipulation_. J.S. Held. https://www.jsheld.com/insights/articles/impact-of-economic-uncertainty-on-financial-statement-manipulation
-[^brookings]: Gale, W. G., & Krupkin, A. (2019). _How big is the problem of tax evasion?_ Brookings Institution. https://www.brookings.edu/articles/how-big-is-the-problem-of-tax-evasion/
-[^nber]: Matthew Davis (2002). _Tax Rates and Tax Evasion_. National Bureau of Economic Research (NBER). https://www.nber.org/digest/feb02/tax-rates-and-tax-evasion
-[^gao]: Government Accountability Office (2023). _Outdated and Old IT Systems Slow Government and Put Taxpayers at Risk_. https://www.gao.gov/blog/outdated-and-old-it-systems-slow-government-and-put-taxpayers-risk
-[^illegal-btc]: Prableen Bajpai (2024). _Countries Where Bitcoin Is Legal and Illegal_. https://www.investopedia.com/articles/forex/041515/countries-where-bitcoin-legal-illegal.asp
+[^investopedia]: [Chen, J. (2023). _How to spot financial statement manipulation_.](https://www.investopedia.com/articles/fundamental-analysis/financial-statement-manipulation.asp)
+[^jsheld]: [Sheld, J. (2022). _Impact of economic uncertainty on financial statement manipulation_.](https://www.jsheld.com/insights/articles/impact-of-economic-uncertainty-on-financial-statement-manipulation)
+[^brookings]: [Gale, W. G., & Krupkin, A. (2019). _How big is the problem of tax evasion?_ Brookings Institution.](https://www.brookings.edu/articles/how-big-is-the-problem-of-tax-evasion/)
+[^nber]: [Matthew Davis (2002). _Tax Rates and Tax Evasion_. National Bureau of Economic Research (NBER).](https://www.nber.org/digest/feb02/tax-rates-and-tax-evasion)
+[^gao]: [Government Accountability Office (2023). _Outdated and Old IT Systems Slow Government and Put Taxpayers at Risk_.](https://www.gao.gov/blog/outdated-and-old-it-systems-slow-government-and-put-taxpayers-risk)
+[^illegal-btc]: [Prableen Bajpai (2024). _Countries Where Bitcoin Is Legal and Illegal_.](https://www.investopedia.com/articles/forex/041515/countries-where-bitcoin-legal-illegal.asp)
+[^zkp-paper]: [Matthew Green (2014). _Zero Knowledge Proofs: An illustrated primer_](https://blog.cryptographyengineering.com/2014/11/27/zero-knowledge-proofs-illustrated-primer/)
+[^zkp-nyt]: New York Times - The Promise of Zero-Knowledge Proofs in Privacy Tech
+[^smart-tax]: OECD - Blockchain and Tax
+[^blockchain-invoice]: EY - Blockchain-enabled tax compliance
+[^imf-digital-tax]: IMF - Taxing the Digital Economy
