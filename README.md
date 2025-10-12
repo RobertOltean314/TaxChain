@@ -77,3 +77,45 @@ Bachelor's Thesis, University of "Lucian Blaga" Sibiu, 2026.
 [^smart-tax]: [OECD - Blockchain and Tax](https://www.oecd.org/tax/blockchain-and-tax.htm)
 [^blockchain-invoice]: [EY - Blockchain-enabled tax compliance](https://www.ey.com/en_gl/tax/how-blockchain-can-enable-tax-compliance)
 [^imf-digital-tax]: [IMF - Taxing the Digital Economy](https://www.imf.org/en/Topics/digital-economy)
+
+# TaxChain Implementation
+
+## Project Structure
+
+```
+app/
+├── frontend/                 # Angular frontend
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── components/
+│   │   │   │   ├── invoice-upload/
+│   │   │   │   ├── tax-dashboard/
+│   │   │   │   └── government-dashboard/
+│   │   │   └── services/
+│   │   └── assets/
+│   └── package.json
+├── backend/                  # Rust microservices
+│   ├── invoice-processor/    # PDF processing service
+│   ├── tax-calculator/       # Tax calculation + ZK proofs
+│   ├── blockchain-service/   # MultiversX integration
+│   └── api-gateway/          # Central API routing
+├── smart-contracts/          # MultiversX smart contracts
+│   ├── tax-compliance/       # Main tax contract
+│   └── deploy/               # Deployment scripts
+└── zk-circuits/              # Zero-knowledge proof circuits
+    ├── tax-calculation/      # Tax proof circuits
+    └── tests/                # Circuit tests
+```
+
+## Technology Stack
+
+### Hybrid Stack (Current)
+
+- **Frontend**: Angular 19+ with TypeScript
+- **Backend**: Rust (Axum framework)
+- **Database**: Firestore (instead of PostgreSQL)
+- **File Storage**: Firebase Storage
+- **Authentication**: Firebase Auth
+- **Blockchain**: MultiversX (Rust smart contracts)
+- **ZK Proofs**: Circom + SnarkJS
+- **Hosting**: Firebase (frontend) + Cloud Run (backend)

@@ -1,0 +1,69 @@
+services:
+  # Rust Backend Service
+  backend:
+    build:
+      context: ./app/backend/tax-calculator
+      dockerfile: Dockerfile
+    container_name: taxchain-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    networks:
+      - taxchain-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Angular Frontend Service  
+  frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile
+    container_name: taxchain-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - taxchain-network
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`taxchain.local`)"
+
+  # Development Frontend (Hot Reload)
+  frontend-dev:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile.dev
+    container_name: taxchain-frontend-dev
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./app/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - taxchain-network
+    environment:
+      - NODE_ENV=development
+    profiles:
+      - dev
+    restart: unless-stopped
+
+networks:
+  taxchain-network:
+    driver: bridge
+
+volumes:
+  node_modules:
