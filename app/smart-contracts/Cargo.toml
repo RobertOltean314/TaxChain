@@ -1,0 +1,10 @@
+[package]
+name = "tax-compliance-contract"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+multiversx-sc = "0.43.0"
+
+[dev-dependencies]
+multiversx-sc-scenario = "0.43.0"

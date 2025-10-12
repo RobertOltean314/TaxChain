@@ -1,0 +1,249 @@
+<div class="min-h-screen bg-gray-50 py-8">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-gray-900 mb-2">
+        🏛️ TaxChain
+      </h1>
+      <p class="text-lg text-gray-600">
+        Blockchain-Based Tax Compliance Demo
+      </p>
+      <div class="mt-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+        🔐 Zero-Knowledge Privacy • ⛓️ MultiversX Blockchain • 🦀 Rust Backend
+      </div>
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div class="mb-6">
+      <div *ngIf="errorMessage" class="alert-error mb-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">{{ errorMessage }}</div>
+        </div>
+      </div>
+      
+      <div *ngIf="successMessage" class="alert-success mb-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">{{ successMessage }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Left Column: Invoice Input -->
+      <div class="bg-white shadow-lg rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+          📄 Add Invoice
+        </h2>
+        
+        <form class="space-y-4">
+          <!-- Amount Input -->
+          <div>
+            <label for="amount" class="block text-sm font-medium text-gray-700 mb-2">
+              Amount (RON)
+            </label>
+            <input
+              type="number"
+              id="amount"
+              [(ngModel)]="currentInvoice.amount"
+              name="amount"
+              placeholder="e.g., 50000"
+              step="0.01"
+              class="form-input"
+            />
+          </div>
+
+          <!-- Type Select -->
+          <div>
+            <label for="type" class="block text-sm font-medium text-gray-700 mb-2">
+              Type
+            </label>
+            <select
+              id="type"
+              [(ngModel)]="currentInvoice.invoice_type"
+              name="type"
+              class="form-select"
+            >
+              <option value="Income">Income (Money you received)</option>
+              <option value="Expense">Expense (Money you spent)</option>
+            </select>
+          </div>
+
+          <!-- Description Input -->
+          <div>
+            <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+              Description (optional)
+            </label>
+            <input
+              type="text"
+              id="description"
+              [(ngModel)]="currentInvoice.description"
+              name="description"
+              placeholder="e.g., Service revenue, Office rent"
+              class="form-input"
+            />
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-wrap gap-3 pt-4">
+            <button
+              type="button"
+              (click)="addInvoice()"
+              class="btn-primary flex items-center"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Invoice
+            </button>
+            
+            <button
+              type="button"
+              (click)="calculateTax()"
+              [disabled]="invoices.length === 0 || isCalculating"
+              class="btn-success flex items-center"
+            >
+              <svg *ngIf="isCalculating" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <svg *ngIf="!isCalculating" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              {{ isCalculating ? 'Calculating...' : 'Calculate Tax' }}
+            </button>
+            
+            <button
+              type="button"
+              (click)="clearAll()"
+              class="btn-danger flex items-center"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear All
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Right Column: Current Invoices & Results -->
+      <div class="space-y-6">
+        <!-- Current Invoices -->
+        <div class="bg-white shadow-lg rounded-xl p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
+            📋 Current Invoices
+            <span class="text-sm text-gray-500 font-normal">{{ invoices.length }} items</span>
+          </h3>
+
+          <div *ngIf="invoices.length === 0" class="text-center py-8 text-gray-500">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p>No invoices added yet.</p>
+            <p class="text-sm">Add some invoices using the form on the left!</p>
+          </div>
+
+          <div *ngIf="invoices.length > 0" class="space-y-3">
+            <div *ngFor="let invoice of invoices; let i = index" class="invoice-item">
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3">
+                    <span [ngClass]="invoice.invoice_type === 'Income' ? 'income-badge' : 'expense-badge'">
+                      {{ invoice.invoice_type }}
+                    </span>
+                    <span class="text-lg font-semibold text-gray-900">
+                      {{ invoice.amount | number:'1.2-2' }} RON
+                    </span>
+                  </div>
+                  <p class="text-sm text-gray-600 mt-1">
+                    {{ invoice.description || 'No description' }}
+                  </p>
+                </div>
+                <button
+                  (click)="removeInvoice(i)"
+                  class="text-red-600 hover:text-red-800 p-1"
+                  title="Remove invoice"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Summary -->
+            <div class="border-t pt-3 mt-4">
+              <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="text-center p-2 bg-green-50 rounded">
+                  <p class="text-green-600 font-medium">Total Income</p>
+                  <p class="text-lg font-bold text-green-800">{{ getTotalIncome() | number:'1.2-2' }} RON</p>
+                </div>
+                <div class="text-center p-2 bg-red-50 rounded">
+                  <p class="text-red-600 font-medium">Total Expenses</p>
+                  <p class="text-lg font-bold text-red-800">{{ getTotalExpenses() | number:'1.2-2' }} RON</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tax Results -->
+        <div *ngIf="taxResult" class="bg-white shadow-lg rounded-xl p-6 border-l-4 border-blue-500">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            💰 Tax Calculation Results
+          </h3>
+          
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <p class="text-sm text-gray-600">Total Income</p>
+              <p class="text-xl font-bold text-gray-900">{{ taxResult.total_income | number:'1.2-2' }} RON</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <p class="text-sm text-gray-600">Total Expenses</p>
+              <p class="text-xl font-bold text-gray-900">{{ taxResult.total_expenses | number:'1.2-2' }} RON</p>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <p class="text-sm text-blue-600">Profit</p>
+              <p class="text-xl font-bold text-blue-900">{{ taxResult.profit | number:'1.2-2' }} RON</p>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg">
+              <p class="text-sm text-red-600">Tax Owed ({{ (taxResult.tax_rate * 100) }}%)</p>
+              <p class="text-2xl font-bold text-red-900">{{ taxResult.tax_owed | number:'1.2-2' }} RON</p>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm font-medium text-purple-900">
+                  🔐 ZK Proof Generated: 
+                  <span [ngClass]="taxResult.zk_proof_generated ? 'text-green-600' : 'text-red-600'">
+                    {{ taxResult.zk_proof_generated ? 'Yes' : 'No' }}
+                  </span>
+                </p>
+                <p class="text-xs text-purple-700 mt-1">
+                  This cryptographic proof verifies your tax calculation without revealing sensitive financial data to the government.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
