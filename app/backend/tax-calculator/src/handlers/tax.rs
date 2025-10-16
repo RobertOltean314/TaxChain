@@ -1,53 +1,26 @@
-use axum::{
-    extract::Json,
-    http::StatusCode,
-    response::Json as ResponseJson,
-};
+use axum::{extract::Json, http::StatusCode, response::Json as ResponseJson};
 
-use crate::models::{InvoiceData, InvoiceType, TaxCalculationResponse, ErrorResponse};
+use crate::dto::TaxCalculationResponseDto;
+use crate::dto::{ErrorResponse, InvoiceData};
 use crate::services::zk_proof::generate_zk_proof;
+use crate::services::TaxCalculationService;
 
 pub async fn calculate_tax(
     Json(invoice_data): Json<InvoiceData>,
-) -> Result<ResponseJson<TaxCalculationResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+) -> Result<ResponseJson<TaxCalculationResponseDto>, (StatusCode, ResponseJson<ErrorResponse>)> {
     println!("Received invoice data: {:?}", invoice_data);
 
+    let service = TaxCalculationService::new();
 
-    let mut total_income = 0.0;
-    let mut total_expenses = 0.0;
-
-    for invoice in &invoice_data.invoices {
-        match invoice.invoice_type {
-            InvoiceType::Income => total_income += invoice.amount,
-            InvoiceType::Expense => total_expenses += invoice.amount,
+    match service.calculate_tax(invoice_data).await {
+        Ok(response) => Ok(ResponseJson(response)),
+        Err(error) => {
+            let status_code = match error.error_code.as_deref() {
+                Some("EMPTY_INVOICES") => StatusCode::BAD_REQUEST,
+                Some("NEGATIVE_PROFIT") => StatusCode::BAD_REQUEST,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            Err((status_code, ResponseJson(error)))
         }
     }
-
-
-    let profit = total_income - total_expenses;
-    
-    if profit < 0.0 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            ResponseJson(ErrorResponse {
-                error: "Negative profit not allowed. Expenses cannot exceed income.".to_string(),
-            }),
-        ));
-    }
-
-    let tax_rate = 0.10;
-    let tax_owed = profit * tax_rate;
-
-    let zk_proof_generated = generate_zk_proof(total_income, total_expenses, tax_owed).await;
-
-    let response = TaxCalculationResponse {
-        total_income,
-        total_expenses,
-        profit,
-        tax_owed,
-        tax_rate,
-        zk_proof_generated,
-    };
-
-    Ok(ResponseJson(response))
 }

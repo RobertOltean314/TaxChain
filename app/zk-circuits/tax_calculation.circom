@@ -22,16 +22,14 @@ template TaxCalculation() {
     signal profit;
     
     // Constraints
-    // 1. Calculate profit = income - expenses
+    // 1.profit >= 0
     profit <== income - expenses;
     
-    // 2. Ensure profit is non-negative (income >= expenses)
     component geq = GreaterEqThan(64); // 64-bit comparison
     geq.in[0] <== income;
     geq.in[1] <== expenses;
     geq.out === 1;
     
-    // 3. Calculate tax = profit * 0.10 (using integer math: multiply by 10, divide by 100)
     signal tax_times_100;
     tax_times_100 <== profit * 10;
     tax_owed <== tax_times_100 / 100;
