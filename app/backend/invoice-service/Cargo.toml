@@ -1,0 +1,23 @@
+[package]
+name = "invoice-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Workspace dependencies
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tower-http = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+rust_decimal = { workspace = true, features = ["serde"] }
+sha2 = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+lazy_static = "1.4"
+
+# Local dependencies
+common-types = { path = "../shared/common-types" }

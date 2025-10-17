@@ -1,0 +1,72 @@
+services:
+  invoice-service:
+    build:
+      context: .
+      dockerfile: invoice-service/Dockerfile
+    container_name: invoice-service
+    ports:
+      - "8001:8001"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - tax-calculator-network
+
+  tax-calculation-service:
+    build:
+      context: .
+      dockerfile: tax-calculation-service/Dockerfile
+    container_name: tax-calculation-service
+    ports:
+      - "8002:8002"
+    environment:
+      - RUST_LOG=info
+      - INVOICE_SERVICE_URL=http://invoice-service:8001
+      - ZK_PROOF_SERVICE_URL=http://zk-proof-service:8004
+    networks:
+      - tax-calculator-network
+    depends_on:
+      - invoice-service
+      - zk-proof-service
+
+  business-entity-service:
+    build:
+      context: .
+      dockerfile: business-entity-service/Dockerfile
+    container_name: business-entity-service
+    ports:
+      - "8003:8003"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - tax-calculator-network
+
+  zk-proof-service:
+    build:
+      context: .
+      dockerfile: zk-proof-service/Dockerfile
+    container_name: zk-proof-service
+    ports:
+      - "8004:8004"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - tax-calculator-network
+
+  validation-service:
+    build:
+      context: .
+      dockerfile: validation-service/Dockerfile
+    container_name: validation-service
+    ports:
+      - "8005:8005"
+    environment:
+      - RUST_LOG=info
+      - BUSINESS_ENTITY_SERVICE_URL=http://business-entity-service:8003
+    networks:
+      - tax-calculator-network
+    depends_on:
+      - business-entity-service
+
+networks:
+  tax-calculator-network:
+    driver: bridge

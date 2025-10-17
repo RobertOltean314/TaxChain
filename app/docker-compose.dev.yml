@@ -1,0 +1,54 @@
+# Development Environment - extends the base configuration
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev # Development dockerfile
+    volumes:
+      - ./frontend/src:/app/src:ro # Hot reload for development
+    environment:
+      - NODE_ENV=development
+      - API_BASE_URL=http://localhost:8001
+    ports:
+      - "4200:4200" # Angular dev server port
+
+  # Override backend services for development
+  invoice-service:
+    environment:
+      - RUST_LOG=debug # More verbose logging
+    volumes:
+      - ./backend/invoice-service/src:/app/src:ro
+
+  tax-calculation-service:
+    environment:
+      - RUST_LOG=debug
+    volumes:
+      - ./backend/tax-calculation-service/src:/app/src:ro
+
+  business-entity-service:
+    environment:
+      - RUST_LOG=debug
+    volumes:
+      - ./backend/business-entity-service/src:/app/src:ro
+
+  zk-proof-service:
+    environment:
+      - RUST_LOG=debug
+    volumes:
+      - ./backend/zk-proof-service/src:/app/src:ro
+
+  validation-service:
+    environment:
+      - RUST_LOG=debug
+    volumes:
+      - ./backend/validation-service/src:/app/src:ro
+  # Development database with exposed ports and test data
+  # postgres:
+  #   environment:
+  #     - POSTGRES_DB=tax_calculator_dev
+  #     - POSTGRES_USER=dev_user
+  #     - POSTGRES_PASSWORD=dev_password
+  #   volumes:
+  #     - ./scripts/test-data.sql:/docker-entrypoint-initdb.d/test-data.sql
