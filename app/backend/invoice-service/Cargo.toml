@@ -19,5 +19,8 @@ tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 lazy_static = "1.4"
 
+# Database
+sqlx = { workspace = true }
+
 # Local dependencies
 common-types = { path = "../shared/common-types" }

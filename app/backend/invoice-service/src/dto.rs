@@ -1,5 +1,6 @@
 use crate::models::Invoice;
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -35,9 +36,9 @@ pub struct InvoiceResponse {
     pub id: Uuid,
     pub numar_serie: String,
     pub issue_date: NaiveDate,
-    pub baza_impozabila: f64,
-    pub total_tva: f64,
-    pub total_de_plata: f64,
+    pub baza_impozabila: Decimal,
+    pub total_tva: Decimal,
+    pub total_de_plata: Decimal,
     pub furnizor_cui: String,
     pub cumparator_cui: String,
     pub created_at: String,

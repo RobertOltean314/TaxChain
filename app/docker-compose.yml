@@ -29,8 +29,12 @@ services:
       - "8001:8001"
     environment:
       - RUST_LOG=info
+      - DATABASE_URL=postgresql://tax_user:tax_password@postgres:5432/tax_calculator
     networks:
       - tax-calculator-network
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   tax-calculation-service:
     build:
@@ -89,6 +93,26 @@ services:
       - business-entity-service
 
   # Supporting Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: tax-calculator-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=tax_calculator
+      - POSTGRES_USER=tax_user
+      - POSTGRES_PASSWORD=tax_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - tax-calculator-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U tax_user -d tax_calculator" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # redis:
   #   image: redis:7-alpine
   #   container_name: tax-calculator-redis
@@ -99,21 +123,6 @@ services:
   #   networks:
   #     - tax-calculator-network
   #   command: redis-server --appendonly yes
-
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: tax-calculator-db
-  #   ports:
-  #     - "5432:5432"
-  #   environment:
-  #     - POSTGRES_DB=tax_calculator
-  #     - POSTGRES_USER=tax_user
-  #     - POSTGRES_PASSWORD=tax_password
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #     - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
-  #   networks:
-  #     - tax-calculator-network
 
   # Reverse Proxy (Optional but recommended)
   nginx:
@@ -136,6 +145,5 @@ networks:
   tax-calculator-network:
     driver: bridge
 
-# volumes:
-#   postgres_data:
-#   redis_data:
+volumes:
+  postgres_data:
