@@ -16,12 +16,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/health", get(handlers::health))
-        
         // ZK proof endpoints
         .route("/api/v1/generate", post(handlers::generate_proof))
         .route("/api/v1/verify", post(handlers::verify_proof))
         .route("/api/v1/proof/:calculation_id", get(handlers::get_proof))
-        
         // CORS
         .layer(CorsLayer::permissive());
 

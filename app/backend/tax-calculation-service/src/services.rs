@@ -1,21 +1,21 @@
-use common_types::{
-    TaxCalculationRequest, TaxCalculationResponse, TaxBreakdown,
-    InvoiceType, CountryCode, ZkProofRequest,
-};
-use chrono::Utc;
-use uuid::Uuid;
 use anyhow::Result;
+use chrono::Utc;
+use common_types::{
+    CountryCode, InvoiceType, TaxBreakdown, TaxCalculationRequest, TaxCalculationResponse,
+    ZkProofRequest,
+};
+use std::env;
+use uuid::Uuid;
 
 pub struct TaxCalculationService {
     zk_proof_service_url: String,
 }
 
 impl TaxCalculationService {
-    pub fn new() -> Self {
-        Self {
-            zk_proof_service_url: std::env::var("ZK_PROOF_SERVICE_URL")
-                .unwrap_or_else(|_| "http://zk-proof-service:8004".to_string()),
-        }
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            zk_proof_service_url: env::var("ZK_PROOF_SERVICE_URL")?,
+        })
     }
 
     pub async fn calculate_tax(
@@ -38,19 +38,17 @@ impl TaxCalculationService {
 
         let country_code = request.country_code.unwrap_or(CountryCode::RO);
         let tax_rates = self.get_tax_rates_for_country(&country_code);
-        
+
         let tax_owed = profit * tax_rates.income_tax_rate;
         let breakdown = self.calculate_tax_breakdown(profit, &tax_rates);
 
         let calculation_id = Uuid::new_v4().to_string();
 
         // Request ZK proof generation
-        let zk_proof_generated = self.request_zk_proof_generation(
-            total_income,
-            total_expenses,
-            tax_owed,
-            &calculation_id,
-        ).await.unwrap_or(false);
+        let zk_proof_generated = self
+            .request_zk_proof_generation(total_income, total_expenses, tax_owed, &calculation_id)
+            .await
+            .unwrap_or(false);
 
         Ok(TaxCalculationResponse {
             total_income,
@@ -87,9 +85,12 @@ impl TaxCalculationService {
         }))
     }
 
-    pub async fn get_tax_rates_by_country(&self, country_code: CountryCode) -> Result<serde_json::Value> {
+    pub async fn get_tax_rates_by_country(
+        &self,
+        country_code: CountryCode,
+    ) -> Result<serde_json::Value> {
         let rates = self.get_tax_rates_for_country(&country_code);
-        
+
         Ok(serde_json::json!({
             "country_code": country_code,
             "income_tax_rate": rates.income_tax_rate,
@@ -120,11 +121,6 @@ impl TaxCalculationService {
                 income_tax_rate: 0.10,
                 social_security_rate: 0.25,
                 health_insurance_rate: 0.10,
-            },
-            CountryCode::US => TaxRates {
-                income_tax_rate: 0.22,
-                social_security_rate: 0.062,
-                health_insurance_rate: 0.0145,
             },
             _ => TaxRates {
                 income_tax_rate: 0.15,

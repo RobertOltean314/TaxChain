@@ -1,12 +1,12 @@
-use common_types::{
-    CreateInvoiceRequest, BusinessEntityValidationRequest, TaxCalculationRequest,
-    InvoiceType, CountryCode,
-};
 use crate::handlers::{
-    ValidationResponse, ComprehensiveValidationRequest, ComprehensiveValidationResponse,
+    ComprehensiveValidationRequest, ComprehensiveValidationResponse, ValidationResponse,
 };
-use chrono::{Datelike, Utc};
 use anyhow::Result;
+use chrono::{Datelike, Utc};
+use common_types::{
+    BusinessEntityValidationRequest, CountryCode, CreateInvoiceRequest, InvoiceType,
+    TaxCalculationRequest,
+};
 
 pub struct ValidationService {
     business_entity_service_url: String,
@@ -20,7 +20,10 @@ impl ValidationService {
         }
     }
 
-    pub async fn validate_invoice(&self, request: CreateInvoiceRequest) -> Result<ValidationResponse> {
+    pub async fn validate_invoice(
+        &self,
+        request: CreateInvoiceRequest,
+    ) -> Result<ValidationResponse> {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
 
@@ -61,7 +64,10 @@ impl ValidationService {
             match country_code {
                 CountryCode::RO => {
                     if request.total_valoare > 10000.0 && request.total_tva == 0.0 {
-                        warnings.push("High-value Romanian invoice without VAT should be reviewed".to_string());
+                        warnings.push(
+                            "High-value Romanian invoice without VAT should be reviewed"
+                                .to_string(),
+                        );
                     }
                 }
                 _ => {}
@@ -76,7 +82,10 @@ impl ValidationService {
         })
     }
 
-    pub async fn validate_business_entity(&self, request: BusinessEntityValidationRequest) -> Result<ValidationResponse> {
+    pub async fn validate_business_entity(
+        &self,
+        request: BusinessEntityValidationRequest,
+    ) -> Result<ValidationResponse> {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
 
@@ -109,7 +118,10 @@ impl ValidationService {
 
         // Try to validate with business entity service
         if let Err(e) = self.validate_with_business_entity_service(&request).await {
-            warnings.push(format!("Could not validate with business entity service: {}", e));
+            warnings.push(format!(
+                "Could not validate with business entity service: {}",
+                e
+            ));
         }
 
         Ok(ValidationResponse {
@@ -120,7 +132,10 @@ impl ValidationService {
         })
     }
 
-    pub async fn validate_tax_calculation(&self, request: TaxCalculationRequest) -> Result<ValidationResponse> {
+    pub async fn validate_tax_calculation(
+        &self,
+        request: TaxCalculationRequest,
+    ) -> Result<ValidationResponse> {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
 
@@ -173,7 +188,10 @@ impl ValidationService {
     }
 
     // TODO: Check for Factory Implementation here
-    pub async fn comprehensive_validation(&self, request: ComprehensiveValidationRequest) -> Result<ComprehensiveValidationResponse> {
+    pub async fn comprehensive_validation(
+        &self,
+        request: ComprehensiveValidationRequest,
+    ) -> Result<ComprehensiveValidationResponse> {
         let mut invoice_validation = None;
         let mut business_entity_validation = None;
         let mut tax_calculation_validation = None;
@@ -185,19 +203,25 @@ impl ValidationService {
         }
 
         if let Some(business_entity) = request.business_entity {
-            business_entity_validation = Some(self.validate_business_entity(business_entity).await?);
+            business_entity_validation =
+                Some(self.validate_business_entity(business_entity).await?);
         }
 
         if let Some(tax_calculation) = request.tax_calculation {
-            tax_calculation_validation = Some(self.validate_tax_calculation(tax_calculation).await?);
+            tax_calculation_validation =
+                Some(self.validate_tax_calculation(tax_calculation).await?);
         }
 
         // Cross-validation rules
         // (Add specific business rules that span multiple components)
 
         let overall_valid = invoice_validation.as_ref().map_or(true, |v| v.is_valid)
-            && business_entity_validation.as_ref().map_or(true, |v| v.is_valid)
-            && tax_calculation_validation.as_ref().map_or(true, |v| v.is_valid)
+            && business_entity_validation
+                .as_ref()
+                .map_or(true, |v| v.is_valid)
+            && tax_calculation_validation
+                .as_ref()
+                .map_or(true, |v| v.is_valid)
             && cross_validation_errors.is_empty();
 
         Ok(ComprehensiveValidationResponse {
@@ -223,11 +247,17 @@ impl ValidationService {
         }
     }
 
-    async fn validate_with_business_entity_service(&self, request: &BusinessEntityValidationRequest) -> Result<()> {
+    async fn validate_with_business_entity_service(
+        &self,
+        request: &BusinessEntityValidationRequest,
+    ) -> Result<()> {
         let client = reqwest::Client::new();
-        
+
         let response = client
-            .post(&format!("{}/api/v1/validate", self.business_entity_service_url))
+            .post(&format!(
+                "{}/api/validate",
+                self.business_entity_service_url
+            ))
             .json(request)
             .send()
             .await?;

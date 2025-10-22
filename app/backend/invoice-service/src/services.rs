@@ -9,6 +9,7 @@ pub struct InvoiceService {
     pool: PgPool,
 }
 
+// TODO: Review querries for DB migration.
 impl InvoiceService {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }

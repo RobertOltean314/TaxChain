@@ -9,7 +9,7 @@ use common_types::{ApiResponse, ErrorResponse};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-//CRUD OPERATIONS for invoices
+// CRUD OPERATIONS for invoices
 
 /// Health check endpoint
 pub async fn health() -> ResponseJson<serde_json::Value> {

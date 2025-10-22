@@ -16,3 +16,4 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 common-types = { path = "../shared/common-types" }
+dotenvy = "0.15"
