@@ -37,7 +37,11 @@ iar Obligatiile Fiscale sunt o structura generica pentru toate tipurile de contr
 
 ```rust
 pub struct ObligatiiFiscale {
-	// To be Implemented
+    impozit_pe_venit: bool,
+    cas: bool,
+    cass: bool,
+    tva: bool,
+    alte_obligatii: String
 }
 ```
 

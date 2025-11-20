@@ -1,5 +1,8 @@
+use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
-pub struct Adress {
+
+#[derive(Deserialize, Serialize)]
+pub struct Address {
     pub tara: String,
     pub judet: String,
     pub localitate: String,
@@ -12,6 +15,7 @@ pub struct Adress {
     pub apartament: Option<String>,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Reprezentant {
     pub nume: String,
     pub prenume: String,
@@ -23,15 +27,17 @@ pub struct Reprezentant {
     pub telefon: String,
     pub email: String,
     pub data_nasterii: DateTime<Utc>,
-    pub adresa_domiciliu: Adress,
+    pub adresa_domiciliu: Address,
 }
 
+#[derive(Deserialize, Serialize)]
 pub enum TipActIdentitate {
     CarteIdentitate,
     Pasaport,
     PermisDeConducere,
 }
 
+#[derive(Deserialize, Serialize)]
 pub enum CalitateReprezentant {
     Proprietar,
     Administrator,
@@ -39,6 +45,7 @@ pub enum CalitateReprezentant {
     AlteCalitati(String),
 }
 
+#[derive(Deserialize, Serialize)]
 pub enum TipDovada {
     ContractDeProprietate,
     ContractDeComodat,
@@ -46,6 +53,7 @@ pub enum TipDovada {
     AlteTipuri(String),
 }
 
+#[derive(Deserialize, Serialize)]
 pub enum StareFiscala {
     Activ,
     Inactiv,

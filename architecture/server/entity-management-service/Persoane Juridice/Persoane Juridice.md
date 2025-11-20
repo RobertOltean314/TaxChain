@@ -6,30 +6,23 @@ Entități cu personalitate juridică și scop lucrativ.
 - [[Companii Nationale]]
 
 ```rust
-    pub PersoanaJuridica {
-        // Pentru SRL
-        pub cui: String,
-        pub cif: String,
-        pub denumire: String,
-        pub nr_registru_comert: String,
-        pub adresa: Adress,
-        pub capital_social: f64 // Optional???
-        pub cod_caen: String/Enum,
-        pub platitor_tva: bool,
-        pub reprezentanti: Vec<Reprezentant> // to be seen
+pub struct PersoanaJuridica {
+    pub cui: String,
+    pub denumire: String,
+    pub nr_reg_comert: String,
+    pub cod_caen: String,
+    pub obiect_de_activitate: String,
+    pub sediu_social: Address,
+    pub capital_social: f64,
+    pub durata_functionare: Option<String>,
+    pub administratori: Vec<Reprezentant>,
+    pub asociati: Vec<Reprezentant>,
+    pub platitor_tva: bool,
+    pub stare_fiscala: StareFiscala,
+    pub data_inregistrare: DateTime<Utc>,
+    pub euid: Option<String>,
+}
 
-
-        // Datele de identificare a administratorului
-        pub cnp: String,
-        pub nume: String
-        pub prenume: String,
-        pub tip_act_identitate: CI, BI sau Pasaport,
-        pub numar_act_identitate: String,
-        pub serie_act_identitate: String,
-        pub calitate: ReprezentantLegal, Inputernicit, ReprezentatDesemnat, NumePropriu
-        pub numar_telefon: String,
-        pub email: String,
-    }
 
 ```
 
