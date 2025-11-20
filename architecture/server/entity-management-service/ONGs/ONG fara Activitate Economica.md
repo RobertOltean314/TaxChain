@@ -1,0 +1,1 @@
+Organizații care funcționează din donații, proiecte, voluntariat.

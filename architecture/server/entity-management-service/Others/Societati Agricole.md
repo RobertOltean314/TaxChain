@@ -1,0 +1,1 @@
+Cooperative, asociații agricole, alte forme specifice mediului rural.
