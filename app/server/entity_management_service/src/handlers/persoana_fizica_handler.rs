@@ -158,7 +158,6 @@ pub async fn create_persoana_fizica(
 ) -> HttpResponse {
     let request = payload.into_inner();
 
-    // start tranzacție
     let mut tx = match pool.begin().await {
         Ok(tx) => tx,
         Err(err) => {
@@ -167,7 +166,6 @@ pub async fn create_persoana_fizica(
         }
     };
 
-    // 1) Generăm UUID pentru persoana_fizica și reprezentant și adresă
     let persoana_uuid = Uuid::new_v4();
     let reprezentant_uuid = Uuid::new_v4();
     let address_uuid = Uuid::new_v4();
@@ -225,7 +223,6 @@ pub async fn create_persoana_fizica(
         return HttpResponse::InternalServerError().body("Eroare la salvarea adresei");
     }
 
-    // 3) Inserăm reprezentantul
     if let Err(err) = sqlx::query!(
         r#"
         INSERT INTO reprezentanti (
@@ -250,8 +247,8 @@ pub async fn create_persoana_fizica(
         )
         "#,
         reprezentant_uuid,
-        persoana_uuid,     // legăm reprezentantul de persoana_fizica
-        "persoana_fizica", // parent_type
+        persoana_uuid,
+        "persoana_fizica",
         request.reprezentant.nume,
         request.reprezentant.prenume,
         request.reprezentant.cnp,
@@ -262,7 +259,7 @@ pub async fn create_persoana_fizica(
         request.reprezentant.telefon,
         request.reprezentant.email,
         request.reprezentant.data_nasterii,
-        address_uuid, // FK address
+        address_uuid,
         Utc::now(),
         Utc::now()
     )
@@ -274,7 +271,6 @@ pub async fn create_persoana_fizica(
         return HttpResponse::InternalServerError().body("Eroare la salvarea reprezentantului");
     }
 
-    // 4) Construim PersoanaFizica pentru insert
     let new_persoana_fizica = PersoanaFizica {
         uuid: persoana_uuid,
         tip: request.tip,
@@ -299,7 +295,6 @@ pub async fn create_persoana_fizica(
         updated_at: Utc::now(),
     };
 
-    // 5) Inserăm persoana_fizica
     let result = sqlx::query!(
         r#"
         INSERT INTO persoane_fizice (
