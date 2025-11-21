@@ -1,11 +1,15 @@
 mod handlers;
+mod helpers;
 mod models;
 mod repository;
 
 use actix_web::{App, HttpServer, web};
 use models::{EntitateStraina, InstitutiePublica, Ong, PersoanaFizica, PersoanaJuridica};
 
-use crate::{handlers::get_persoana_fizica, repository::database_connection::create_pool};
+use crate::{
+    handlers::{create_persoana_fizica, get_persoana_fizica},
+    repository::database_connection::create_pool,
+};
 
 pub struct InregistrareFiscala {
     contribuabil: Contribuabil,
@@ -48,6 +52,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(pool.clone()))
             .service(get_persoana_fizica)
+            .service(create_persoana_fizica)
     })
     .bind((host, port))?
     .run()

@@ -1,4 +1,6 @@
-use crate::models::common::{AdresaResponse, ReprezentantResponse, StareFiscala, TipDovada};
+use crate::models::common::{
+    Address, AdresaResponse, ReprezentantRequest, ReprezentantResponse, StareFiscala, TipDovada,
+};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::{
@@ -7,7 +9,7 @@ use sqlx::{
 };
 use uuid::Uuid;
 
-#[derive(Debug, Clone, FromRow, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct PersoanaFizica {
     pub uuid: Uuid,
 
@@ -59,6 +61,31 @@ pub struct PersoanaFizicaResponse {
     pub stare_fiscala: String,
     pub inregistrat_in_spv: bool,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PersoanaFizicaRequest {
+    pub tip: TipPersoanaFizica,
+    pub cnp: String,
+
+    pub nume: String,
+    pub prenume: String,
+    pub serie_act_identitate: String,
+    pub numar_act_identitate: String,
+    pub data_nasterii: chrono::NaiveDate,
+    pub cetatenie: String,
+
+    pub adresa_domiciliu: Address,
+    pub dovada_drept_folosinta: Option<TipDovada>,
+    pub reprezentant: ReprezentantRequest,
+
+    pub cod_caen: Option<String>,
+    pub data_inregistrarii: Option<chrono::NaiveDate>,
+    pub euid: Option<String>,
+    pub nr_ordine_reg_comert: Option<String>,
+    pub platitor_tva: bool,
+    pub stare_fiscala: StareFiscala,
+    pub inregistrat_in_spv: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]

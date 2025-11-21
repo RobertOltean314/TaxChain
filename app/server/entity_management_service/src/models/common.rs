@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -18,6 +19,11 @@ pub struct Address {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Reprezentant {
+    pub uuid: Uuid,
+
+    pub parent_id: Uuid,
+    pub parent_type: String,
+
     pub nume: String,
     pub prenume: String,
     pub cnp: String,
@@ -27,11 +33,16 @@ pub struct Reprezentant {
     pub calitate: CalitateReprezentant,
     pub telefon: String,
     pub email: String,
-    pub data_nasterii: DateTime<Utc>,
-    pub adresa_domiciliu: Address,
+    pub data_nasterii: NaiveDate,
+
+    pub adresa_domiciliu: Uuid,
+
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
+#[sqlx(type_name = "tip_act_identitate", rename_all = "snake_case")]
 pub enum TipActIdentitate {
     CarteIdentitate,
     Pasaport,
@@ -39,6 +50,7 @@ pub enum TipActIdentitate {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
+#[sqlx(type_name = "calitate_reprezentant", rename_all = "snake_case")]
 pub enum CalitateReprezentant {
     Proprietar,
     Administrator,
@@ -56,7 +68,7 @@ pub enum TipDovada {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
-#[sqlx(type_name = "tip_dovada", rename_all = "snake_case")]
+#[sqlx(type_name = "stare_fiscala", rename_all = "snake_case")]
 pub enum StareFiscala {
     Activ,
     Inactiv,
@@ -64,7 +76,7 @@ pub enum StareFiscala {
     Radiat,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct AdresaResponse {
     pub uuid: Uuid,
     pub tara: String,
@@ -80,12 +92,31 @@ pub struct AdresaResponse {
     pub detalii: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+pub struct ReprezentantRequest {
+    pub parent_id: Uuid,
+    pub parent_type: String,
+    pub nume: String,
+    pub prenume: String,
+    pub cnp: String,
+    pub tip_act_identitate: TipActIdentitate,
+    pub serie_act_identitate: String,
+    pub numar_act_identitate: String,
+    pub calitate: CalitateReprezentant,
+    pub telefon: String,
+    pub email: String,
+    pub data_nasterii: NaiveDate,
+    pub adresa_domiciliu: Uuid,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct ReprezentantResponse {
     pub uuid: Uuid,
     pub nume: String,
     pub prenume: String,
-    pub email: String,
     pub telefon: String,
-    pub calitate: String,
+    pub email: String,
+    pub calitate: CalitateReprezentant,
+    pub adresa_domiciliu: Uuid,
+    pub created_at: DateTime<Utc>,
 }
