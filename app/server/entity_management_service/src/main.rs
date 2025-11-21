@@ -1,10 +1,11 @@
 mod handlers;
 mod models;
+mod repository;
 
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpServer, web};
 use models::{EntitateStraina, InstitutiePublica, Ong, PersoanaFizica, PersoanaJuridica};
 
-use crate::handlers::get_persoana_fizica_test;
+use crate::{handlers::get_persoana_fizica, repository::database_connection::create_pool};
 
 pub struct InregistrareFiscala {
     contribuabil: Contribuabil,
@@ -30,14 +31,25 @@ pub struct ObligatiiFiscale {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let pool = create_pool().await;
+
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run database migrations");
+
     let host = "127.0.0.1";
     let port = 8080;
 
     println!("Starting Entity Management Service...");
     println!("Server running at http://{}:{}", host, port);
 
-    HttpServer::new(|| App::new().service(get_persoana_fizica_test))
-        .bind((host, port))?
-        .run()
-        .await
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(pool.clone()))
+            .service(get_persoana_fizica)
+    })
+    .bind((host, port))?
+    .run()
+    .await
 }

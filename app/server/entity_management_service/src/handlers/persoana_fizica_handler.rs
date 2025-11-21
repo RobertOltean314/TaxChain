@@ -1,91 +1,137 @@
-use actix_web::{HttpResponse, get, web};
-use chrono::{DateTime, Utc};
-use sqlx::types::{Uuid, chrono};
+use actix_web::{HttpResponse, Responder, get, web};
+use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::models::{
-    PersoanaFizica,
-    common::{
-        Address, CalitateReprezentant, Reprezentant, StareFiscala, TipActIdentitate, TipDovada,
-    },
-    persoana_fizica::TipPersoanaFizica,
+    common::{AdresaResponse, ReprezentantResponse},
+    persoana_fizica::PersoanaFizicaResponse,
 };
 
 #[get("/api/persoana_fizica/{id}")]
-pub async fn get_persoana_fizica_test(path: web::Path<Uuid>) -> HttpResponse {
-    let _id = path.into_inner();
+pub async fn get_persoana_fizica(path: web::Path<Uuid>, pool: web::Data<PgPool>) -> impl Responder {
+    let id = path.into_inner();
 
-    let persoana_test = PersoanaFizica {
-        tip: TipPersoanaFizica::PFA,
+    let persoana_result = sqlx::query!(
+        r#"
+        SELECT 
+            uuid,
+            tip::TEXT AS "tip!",
+            nume,
+            prenume,
+            serie_act_identitate,
+            numar_act_identitate,
+            data_nasterii,
+            cetatenie,
+            adresa_domiciliu_uuid,
+            reprezentant_uuid,
+            cod_caen,
+            platitor_tva,
+            stare_fiscala::TEXT AS "stare_fiscala!",
+            inregistrat_in_spv,
+            created_at
+        FROM persoane_fizice
+        WHERE uuid = $1
+        "#,
+        id
+    )
+    .fetch_optional(&**pool)
+    .await;
 
-        reprezentant: Reprezentant {
-            cnp: "0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08".to_string(),
-            nume: "Popescu".to_string(),
-            prenume: "Maria".to_string(),
-            tip_act_identitate: TipActIdentitate::CarteIdentitate,
-            serie_act_identitate: "CJ".to_string(),
-            numar_act_identitate: "876543".to_string(),
-            calitate: CalitateReprezentant::Administrator,
-            telefon: "+40740123456".to_string(),
-            email: "maria.popescu@pfa.ro".to_string(),
-            data_nasterii: DateTime::parse_from_rfc3339("1985-02-10T00:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc),
-            adresa_domiciliu: Address {
-                tara: "România".to_string(),
-                judet: "Cluj".to_string(),
-                localitate: "Cluj-Napoca".to_string(),
-                cod_postal: Some("400267".to_string()),
-                strada: "Piața Unirii".to_string(),
-                numar: "5".to_string(),
-                bloc: Some("B2".to_string()),
-                scara: Some("A".to_string()),
-                etaj: Some("3".to_string()),
-                apartament: Some("12".to_string()),
-            },
-        },
-
-        cnp: "0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08".to_string(), // hash keccak256
-
-        nume: "Popescu".to_string(),
-        prenume: "Ion".to_string(),
-
-        serie_act_identitate: "CJ".to_string(),
-        numar_act_identitate: "765432".to_string(),
-
-        data_nasterii: DateTime::parse_from_rfc3339("1980-07-15T00:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc),
-
-        cetatenie: "Română".to_string(),
-
-        adresa_domiciliu: Address {
-            tara: "România".to_string(),
-            judet: "Cluj".to_string(),
-            localitate: "Cluj-Napoca".to_string(),
-            cod_postal: Some("400604".to_string()),
-            strada: "Memorandumului".to_string(),
-            numar: "28".to_string(),
-            bloc: None,
-            scara: None,
-            etaj: Some("2".to_string()),
-            apartament: Some("7".to_string()),
-        },
-
-        dovada_drept_folosinta: TipDovada::ContractDeInchiriere,
-
-        cod_caen: "6201".to_string(), // Programare IT – cea mai frecventă la PFA Cluj 😄
-
-        data_inregistrarii: DateTime::parse_from_rfc3339("2023-03-10T10:30:00Z")
-            .unwrap()
-            .with_timezone(&Utc),
-
-        euid: Some("ROONRC.F40/567/2023".to_string()),
-        nr_ordine_reg_comert: Some("F40/567/2023".to_string()),
-
-        platitor_tva: true,
-        stare_fiscala: StareFiscala::Activ,
-        inregistrat_in_spv: true,
+    let persoana = match persoana_result {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Persoana fizică nu a fost găsită"
+            }));
+        }
+        Err(e) => {
+            log::error!("Eroare DB persoana: {:?}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Eroare internă de server"
+            }));
+        }
     };
 
-    HttpResponse::Ok().json(persoana_test)
+    let adresa_result = sqlx::query!(
+        r#"
+        SELECT uuid, tara, judet, localitate, cod_postal, strada, numar,
+               bloc, scara, etaj, apartament, detalii
+        FROM address
+        WHERE uuid = $1
+        "#,
+        persoana.adresa_domiciliu_uuid
+    )
+    .fetch_one(&**pool)
+    .await;
+
+    let adresa = match adresa_result {
+        Ok(a) => AdresaResponse {
+            uuid: a.uuid,
+            tara: a.tara,
+            judet: a.judet,
+            localitate: a.localitate,
+            cod_postal: a.cod_postal,
+            strada: a.strada,
+            numar: a.numar,
+            bloc: a.bloc,
+            scara: a.scara,
+            etaj: a.etaj,
+            apartament: a.apartament,
+            detalii: a.detalii,
+        },
+        Err(e) => {
+            log::error!("Eroare DB adresa: {:?}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Eroare la încărcarea adresei"
+            }));
+        }
+    };
+
+    let reprezentant_result = sqlx::query!(
+        r#"
+        SELECT uuid, nume, prenume, email, telefon, calitate::TEXT AS "calitate!"
+        FROM reprezentanti
+        WHERE uuid = $1
+        "#,
+        persoana.reprezentant_uuid
+    )
+    .fetch_one(&**pool)
+    .await;
+
+    let reprezentant = match reprezentant_result {
+        Ok(r) => ReprezentantResponse {
+            uuid: r.uuid,
+            nume: r.nume,
+            prenume: r.prenume,
+            email: r.email,
+            telefon: r.telefon,
+            calitate: r.calitate,
+        },
+        Err(e) => {
+            log::error!("Eroare DB reprezentant: {:?}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Eroare la încărcarea reprezentantului"
+            }));
+        }
+    };
+
+    let response = PersoanaFizicaResponse {
+        uuid: persoana.uuid,
+        tip: persoana.tip,
+        nume: persoana.nume,
+        prenume: persoana.prenume,
+        serie_act_identitate: persoana.serie_act_identitate,
+        numar_act_identitate: persoana.numar_act_identitate,
+        data_nasterii: persoana.data_nasterii,
+        cetatenie: persoana.cetatenie,
+        adresa_domiciliu: adresa,
+        reprezentant: reprezentant,
+        cod_caen: persoana.cod_caen,
+        platitor_tva: persoana.platitor_tva,
+        stare_fiscala: persoana.stare_fiscala,
+        inregistrat_in_spv: persoana.inregistrat_in_spv,
+        created_at: persoana.created_at,
+    };
+
+    HttpResponse::Ok().json(response)
 }
