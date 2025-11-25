@@ -1,0 +1,1 @@
+Persoane juridice de utilitate publică cu regim fiscal distinct.

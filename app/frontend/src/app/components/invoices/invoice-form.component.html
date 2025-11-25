@@ -1,0 +1,301 @@
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+  <div class="mb-6">
+    <button
+      routerLink="/invoices"
+      class="text-blue-600 hover:text-blue-800 flex items-center mb-4"
+    >
+      <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M10 19l-7-7m0 0l7-7m-7 7h18"
+        />
+      </svg>
+      Înapoi la Lista
+    </button>
+    <h1 class="text-3xl font-bold">Factură Nouă</h1>
+  </div>
+
+  <form [formGroup]="invoiceForm" (ngSubmit)="onSubmit()" class="space-y-6">
+    <!-- Invoice Header -->
+    <div class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">Informații Generale</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Număr Serie <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="numar_serie"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder="FACT-2024-001"
+          />
+          <p *ngIf="isFieldInvalid('numar_serie')" class="text-red-500 text-sm mt-1">
+            Numărul de serie este obligatoriu
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"> Data Emiterii </label>
+          <input
+            type="date"
+            formControlName="issue_date"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Furnizor -->
+    <div class="bg-white rounded-lg shadow p-6" formGroupName="furnizor">
+      <h2 class="text-xl font-semibold mb-4">Furnizor</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Nume <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="nume"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder="SC Compania SRL"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            CUI <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="cui"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder="RO12345678"
+          />
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Adresă <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="adresa"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Str. Exemplu Nr. 1, București"
+          />
+        </div>
+
+        <div>
+          <label class="flex items-center">
+            <input type="checkbox" formControlName="platitor_tva" class="mr-2" />
+            <span class="text-sm font-medium text-gray-700">Plătitor TVA</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cumpărător -->
+    <div class="bg-white rounded-lg shadow p-6" formGroupName="cumparator">
+      <h2 class="text-xl font-semibold mb-4">Cumpărător</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Nume <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="nume"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder="SC Client SRL"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            CUI <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="cui"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder="RO87654321"
+          />
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Adresă <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            formControlName="adresa"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Str. Client Nr. 2, Cluj-Napoca"
+          />
+        </div>
+
+        <div>
+          <label class="flex items-center">
+            <input type="checkbox" formControlName="platitor_tva" class="mr-2" />
+            <span class="text-sm font-medium text-gray-700">Plătitor TVA</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Items -->
+    <div class="bg-white rounded-lg shadow p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Articole</h2>
+        <button
+          type="button"
+          (click)="addLineItem()"
+          class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm flex items-center"
+        >
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          Adaugă Articol
+        </button>
+      </div>
+
+      <div formArrayName="line_items" class="space-y-4">
+        <div
+          *ngFor="let item of lineItems.controls; let i = index"
+          [formGroupName]="i"
+          class="border border-gray-200 rounded-lg p-4 relative"
+        >
+          <button
+            type="button"
+            (click)="removeLineItem(i)"
+            *ngIf="lineItems.length > 1"
+            class="absolute top-2 right-2 text-red-600 hover:text-red-800"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Descriere <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="description"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Denumire produs/serviciu"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Cantitate <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                formControlName="quantity"
+                step="0.01"
+                (input)="calculateTotal(i)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                placeholder="1.00"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Preț Unitar <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                formControlName="unit_price"
+                step="0.01"
+                (input)="calculateTotal(i)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                placeholder="100.00"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1"> Cota TVA (%) </label>
+              <input
+                type="number"
+                formControlName="tax_rate"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                placeholder="19"
+              />
+            </div>
+
+            <div class="md:col-span-4">
+              <div class="text-sm text-gray-600">
+                <span class="font-medium"
+                  >Total produs:
+                  {{ item.get('total_price')?.value | number : '1.2-2' }} RON</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p *ngIf="lineItems.length === 0" class="text-gray-500 text-center py-8">
+        Adaugă cel puțin un articol la factură
+      </p>
+    </div>
+
+    <!-- Error Message -->
+    <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div class="flex items-center">
+        <svg
+          class="w-5 h-5 text-red-600 mr-2"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <p class="text-red-800">{{ errorMessage }}</p>
+      </div>
+    </div>
+
+    <!-- Submit Button -->
+    <div class="flex justify-end space-x-4">
+      <button
+        type="button"
+        routerLink="/invoices"
+        class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+      >
+        Anulează
+      </button>
+      <button
+        type="submit"
+        [disabled]="isSubmitting"
+        class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-blue-300"
+      >
+        {{ isSubmitting ? 'Se salvează...' : 'Salvează Factură' }}
+      </button>
+    </div>
+  </form>
+</div>

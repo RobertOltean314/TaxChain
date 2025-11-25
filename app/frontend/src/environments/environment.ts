@@ -1,6 +1,8 @@
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:8081',  // Local development
-  appName: 'TaxChain Dev',
-  version: '1.0.0-dev'
+  apiUrl: 'http://localhost/api/v1',
+  apiTimeout: 30000, // 30 seconds
+  enableLogging: true,
+  retryAttempts: 3,
+  retryDelay: 1000, // 1 second
 };

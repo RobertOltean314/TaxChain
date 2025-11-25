@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://backend:8081',  // Docker service name
+  apiUrl: '/api/v1',
   appName: 'TaxChain',
-  version: '1.0.0'
+  version: '1.0.0',
 };

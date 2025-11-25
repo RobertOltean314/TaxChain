@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = [
+    "entity_management_service",
+    "invoice_management_service",
+    "tax_management_service",
+    "zk_proof_service",
+]
+
+[workspace.dependencies]
+actix-web = "4.4"
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
+uuid = { version = "1.6", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] } 
+dotenvy = { version = "0.15.0" }
+serde_json = { version = "1.0.145" }
+log = { version = "0.4.28" }
+sha2 = { version = "0.10.9" }
+validator = { version = "0.20.0" }

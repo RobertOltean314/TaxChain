@@ -1,0 +1,1 @@
+Organizații care vând produse / servicii sau au angajați.
