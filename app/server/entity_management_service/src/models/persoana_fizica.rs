@@ -44,6 +44,7 @@ pub struct PersoanaFizica {
     pub updated_at: DateTime<Utc>,
 }
 
+// TODO: Implement validations for all fields
 #[derive(Serialize, Deserialize, Validate)]
 pub struct PersoanaFizicaRequest {
     pub tip: TipPersoanaFizica,

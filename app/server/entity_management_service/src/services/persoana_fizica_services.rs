@@ -1,6 +1,6 @@
 use actix_web::{
     Error, HttpResponse,
-    web::{self, Data, Json},
+    web::{self, Data, Json, Path},
 };
 use chrono::Utc;
 use sqlx::PgPool;
@@ -358,4 +358,31 @@ pub async fn create_new_persoana_fizica(
             Ok(HttpResponse::InternalServerError().body("Eroare la salvarea persoanei fizice"))
         }
     }
+}
+
+pub async fn delete_persoana_fizica(
+    path: web::Path<Uuid>,
+    pool: Data<PgPool>,
+) -> Result<(), sqlx::Error> {
+    let id = path.into_inner();
+
+    sqlx::query!(
+        r#"
+        DELETE FROM persoane_fizice
+        WHERE uuid = $1
+        "#,
+        id
+    )
+    .execute(pool.get_ref())
+    .await?;
+
+    Ok(())
+}
+
+pub async fn update_persoana_fizica(
+    path: Path<Uuid>,
+    body: Json<PersoanaFizicaRequest>,
+    pool: Data<PgPool>,
+) {
+    todo!("Implement the Update feature")
 }
