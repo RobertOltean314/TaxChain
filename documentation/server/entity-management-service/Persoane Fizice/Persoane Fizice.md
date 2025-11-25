@@ -79,4 +79,8 @@ pub enum StareFiscala {
 
 ```
 
+To be later added:
+
+- WalletID
+
 [Pagina Principala](../Entity.md)

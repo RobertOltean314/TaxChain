@@ -2,6 +2,7 @@ mod handlers;
 mod helpers;
 mod models;
 mod repository;
+mod services;
 
 use actix_web::{App, HttpServer, web};
 use models::{EntitateStraina, InstitutiePublica, Ong, PersoanaFizica, PersoanaJuridica};

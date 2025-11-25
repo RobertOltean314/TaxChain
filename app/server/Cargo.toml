@@ -18,3 +18,4 @@ dotenvy = { version = "0.15.0" }
 serde_json = { version = "1.0.145" }
 log = { version = "0.4.28" }
 sha2 = { version = "0.10.9" }
+validator = { version = "0.20.0" }
