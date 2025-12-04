@@ -1,3 +1,14 @@
+use crate::{
+    helpers::hash_cnp,
+    models::{
+        PersoanaFizica,
+        common::{
+            AdresaResponse, CalitateReprezentant, ReprezentantResponse, StareFiscala,
+            TipActIdentitate,
+        },
+        persoana_fizica::{PersoanaFizicaRequest, PersoanaFizicaResponse, TipPersoanaFizica},
+    },
+};
 use actix_web::{
     Error, HttpResponse,
     web::{self, Data, Json, Path},
@@ -5,15 +16,6 @@ use actix_web::{
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
-
-use crate::{
-    helpers::hash_cnp,
-    models::{
-        PersoanaFizica,
-        common::{AdresaResponse, CalitateReprezentant, ReprezentantResponse},
-        persoana_fizica::{PersoanaFizicaRequest, PersoanaFizicaResponse},
-    },
-};
 
 pub async fn get_persoana_fizica_by_id(
     path: web::Path<Uuid>,
@@ -383,6 +385,174 @@ pub async fn update_persoana_fizica(
     path: Path<Uuid>,
     body: Json<PersoanaFizicaRequest>,
     pool: Data<PgPool>,
-) {
-    todo!("Implement the Update feature")
+) -> Result<serde_json::Value, sqlx::Error> {
+    let request = body.into_inner();
+    let persoana_uuid = path.into_inner();
+
+    let mut tx = pool.begin().await.map_err(|e| {
+        eprintln!("Failed to start transaction: {:?}", e);
+        e
+    })?;
+
+    let existing = sqlx::query!(
+        r#"
+        SELECT uuid, reprezentant_uuid, adresa_domiciliu_uuid 
+        FROM persoane_fizice 
+        WHERE uuid = $1
+        "#,
+        persoana_uuid
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    if existing.is_none() {
+        return Err(sqlx::Error::RowNotFound);
+    }
+
+    let existing = existing.unwrap();
+    let old_reprezentant_uuid = existing.reprezentant_uuid;
+    let old_address_uuid = existing.adresa_domiciliu_uuid;
+
+    // Step 2: Update the existing address OR create a new one
+    // Option A: Update the existing address
+    sqlx::query!(
+        r#"
+        UPDATE address 
+        SET 
+            tara = $2,
+            judet = $3,
+            localitate = $4,
+            cod_postal = $5,
+            strada = $6,
+            numar = $7,
+            bloc = $8,
+            scara = $9,
+            etaj = $10,
+            apartament = $11,
+            updated_at = NOW()
+        WHERE uuid = $1
+        "#,
+        old_address_uuid,
+        request.adresa_domiciliu.tara,
+        request.adresa_domiciliu.judet,
+        request.adresa_domiciliu.localitate,
+        request.adresa_domiciliu.cod_postal,
+        request.adresa_domiciliu.strada,
+        request.adresa_domiciliu.numar,
+        request.adresa_domiciliu.bloc,
+        request.adresa_domiciliu.scara,
+        request.adresa_domiciliu.etaj,
+        request.adresa_domiciliu.apartament,
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| {
+        eprintln!("Failed to update address: {:?}", e);
+        e
+    })?;
+
+    let reprezentant_address_uuid = request.reprezentant.adresa_domiciliu;
+
+    sqlx::query!(
+        r#"
+        UPDATE reprezentanti 
+        SET 
+            nume = $2,
+            prenume = $3,
+            cnp = $4,
+            tip_act_identitate = $5,
+            serie_act_identitate = $6,
+            numar_act_identitate = $7,
+            calitate = $8,
+            telefon = $9,
+            email = $10,
+            data_nasterii = $11,
+            adresa_domiciliu = $12,
+            updated_at = NOW()
+        WHERE uuid = $1
+        "#,
+        old_reprezentant_uuid,
+        request.reprezentant.nume,
+        request.reprezentant.prenume,
+        request.reprezentant.cnp,
+        request.reprezentant.tip_act_identitate as TipActIdentitate,
+        request.reprezentant.serie_act_identitate,
+        request.reprezentant.numar_act_identitate,
+        request.reprezentant.calitate as CalitateReprezentant,
+        request.reprezentant.telefon,
+        request.reprezentant.email,
+        request.reprezentant.data_nasterii,
+        reprezentant_address_uuid,
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| {
+        eprintln!("Failed to update reprezentant: {:?}", e);
+        e
+    })?;
+
+    let cnp_hash = hash_cnp(&request.cnp);
+
+    sqlx::query!(
+        r#"
+        UPDATE persoane_fizice 
+        SET 
+            tip = $2,
+            cnp_hash = $3,
+            nume = $4,
+            prenume = $5,
+            serie_act_identitate = $6,
+            numar_act_identitate = $7,
+            data_nasterii = $8,
+            cetatenie = $9,
+            dovada_drept_folosinta = $10,
+            cod_caen = $11,
+            data_inregistrarii = $12,
+            euid = $13,
+            nr_ordine_reg_comert = $14,
+            platitor_tva = $15,
+            stare_fiscala = $16,
+            inregistrat_in_spv = $17,
+            updated_at = NOW()
+        WHERE uuid = $1
+        "#,
+        persoana_uuid,
+        request.tip as TipPersoanaFizica,
+        cnp_hash,
+        request.nume,
+        request.prenume,
+        request.serie_act_identitate,
+        request.numar_act_identitate,
+        request.data_nasterii,
+        request.cetatenie,
+        request.dovada_drept_folosinta as _,
+        request.cod_caen,
+        request.data_inregistrarii,
+        request.euid,
+        request.nr_ordine_reg_comert,
+        request.platitor_tva,
+        request.stare_fiscala as StareFiscala,
+        request.inregistrat_in_spv,
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| {
+        eprintln!("Failed to update persoana fizica: {:?}", e);
+        e
+    })?;
+
+    tx.commit().await.map_err(|e| {
+        eprintln!("Failed to commit transaction: {:?}", e);
+        e
+    })?;
+
+    Ok(serde_json::json!({
+        "success": true,
+        "message": "Persoana fizică actualizată cu succes",
+        "data": {
+            "uuid": persoana_uuid,
+            "reprezentant_uuid": old_reprezentant_uuid,
+            "address_uuid": old_address_uuid
+        }
+    }))
 }

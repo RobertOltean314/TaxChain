@@ -45,16 +45,20 @@ pub async fn delete_persoana_fizica(path: Path<Uuid>, pool: Data<PgPool>) -> imp
     }
 }
 
-// #[put("/api/persoana_fizica/{id}")]
-// pub async fn update_persoana_fizica(
-//     path: Path<Uuid>,
-//     body: Json<PersoanaFizicaRequest>,
-//     pool: Data<PgPool>,
-// ) -> impl Responder {
-//     match services::update_persoana_fizica(path, body, pool).await {
-//         Ok(response) => HttpResponse::Ok().json(response),
-//         Err(error) => {
-//             HttpResponse::NotFound().body(format!("Failed to update persoana_fizica: {:?}", error))
-//         }
-//     }
-// }
+#[put("{id}")]
+pub async fn update_persoana_fizica(
+    path: Path<Uuid>,
+    body: Json<PersoanaFizicaRequest>,
+    pool: Data<PgPool>,
+) -> impl Responder {
+    match services::update_persoana_fizica(path, body, pool).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(error) => {
+            eprintln!("Error updating persoana fizica: {:?}", error);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to update persoana fizica",
+                "details": error.to_string()
+            }))
+        }
+    }
+}
