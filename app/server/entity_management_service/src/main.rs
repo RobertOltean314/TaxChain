@@ -2,40 +2,19 @@ mod handlers;
 mod helpers;
 mod models;
 mod repository;
+mod routes;
 mod services;
 
+use std::env;
+
 use actix_web::{App, HttpServer, web};
-use models::{EntitateStraina, InstitutiePublica, Ong, PersoanaFizica, PersoanaJuridica};
 
-use crate::{
-    handlers::{create_persoana_fizica, get_persoana_fizica},
-    repository::database_connection::create_pool,
-};
-
-pub struct InregistrareFiscala {
-    contribuabil: Contribuabil,
-    obligatii: ObligatiiFiscale,
-}
-
-pub enum Contribuabil {
-    PersoanaFizica(PersoanaFizica),
-    PersoanaJuridica(PersoanaJuridica),
-    Ong(Ong),
-    InstitutiePublica(InstitutiePublica),
-    EntitateStraina(EntitateStraina),
-    Other(String),
-}
-
-pub struct ObligatiiFiscale {
-    impozit_pe_venit: bool,
-    cas: bool,
-    cass: bool,
-    tva: bool,
-    alte_obligatii: String,
-}
+use crate::repository::database_connection::create_pool;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenvy::dotenv().ok();
+
     let pool = create_pool().await;
 
     sqlx::migrate!("./migrations")
@@ -43,8 +22,11 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to run database migrations");
 
-    let host = "127.0.0.1";
-    let port = 8080;
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "8080".to_string())
+        .parse()
+        .expect("PORT must have a valid number");
+    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 
     println!("Starting Entity Management Service...");
     println!("Server running at http://{}:{}", host, port);
@@ -52,10 +34,9 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .service(get_persoana_fizica)
-            .service(create_persoana_fizica)
+            .service(web::scope("/api").service(routes::persoana_fizica_routes()))
     })
-    .bind((host, port))?
+    .bind(("127.0.0.1", port))?
     .run()
     .await
 }
