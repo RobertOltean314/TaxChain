@@ -7,7 +7,6 @@ pub mod persoana_fizica;
 pub mod persoana_juridica;
 
 pub use entitate_straina::EntitateStraina;
-pub use inregistrare_fiscala::InregistrareFiscala;
 pub use institutie_publica::InstitutiePublica;
 pub use ong::Ong;
 pub use persoana_fizica::PersoanaFizica;

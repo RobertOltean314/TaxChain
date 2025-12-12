@@ -3,6 +3,7 @@ use utoipa::ToSchema;
 
 use crate::models::common::{Address, Reprezentant, StareFiscala};
 #[derive(ToSchema)]
+#[allow(dead_code)]
 pub struct PersoanaJuridica {
     pub cui: String,
     pub denumire: String,

@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                uuid,\n                nume,\n                prenume,\n                telefon,\n                email,\n                calitate as \"calitate!: CalitateReprezentant\",\n                adresa_domiciliu,\n                created_at\n            FROM reprezentanti\n            WHERE uuid = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "nume",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "prenume",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "telefon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "calitate!: CalitateReprezentant",
+        "type_info": {
+          "Custom": {
+            "name": "calitate_reprezentant",
+            "kind": {
+              "Enum": [
+                "proprietar",
+                "administrator",
+                "mandatar",
+                "alt_reprezentant"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "adresa_domiciliu",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "9dea5ed732ebab282826578ccb1d6150dd320d478f191e19397d9072803f9f72"
+}

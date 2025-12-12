@@ -5,8 +5,6 @@ use crate::handlers::institutie_publica_handlers::*;
 use crate::handlers::ong_handlers::*;
 use crate::handlers::persoana_fizica_handlers::*;
 use crate::handlers::persoana_juridica_handlers::*;
-use crate::handlers::entity_search_handlers::*;
-use crate::handlers::entity_dashboard_handlers::*;
 
 use crate::models::entitate_straina::{
     EntitateStraina, EntitateStrainaRequest, EntitateStrainaResponse,
@@ -60,10 +58,6 @@ use crate::models::persoana_juridica::{
         delete_entitate_straina,
         update_entitate_straina,
 
-        // Entity Search & Dashboard
-        search_entities,
-        get_my_entities,
-
         // Others???
     ),
     components(
@@ -93,13 +87,6 @@ use crate::models::persoana_juridica::{
             EntitateStrainaRequest,
             EntitateStrainaResponse,
 
-            // Entity Search & Dashboard
-            EntitySearchResult,
-            SearchResponse,
-            MyEntitySummary,
-            DashboardResponse,
-            SearchParams,
-
             // Other Types
         )
     ),
@@ -108,9 +95,7 @@ use crate::models::persoana_juridica::{
         (name = "persoane-juridice", description = "Societate cu raspundere Limitata (STR), Intreprinderi Mici si Mijlocii (IMM)"),
         (name = "ongs", description = "Organizatii Non-Guvernamentale (ONGs)"),
         (name = "institutii-publice", description = "Insstitutii Guvernamentale, Primarii, Scoli, Spitale, etc"),
-        (name = "entitati-straine", description = "Firme cu filiale in Romania"),
-        (name = "entity-search", description = "Public entity search - no authentication required"),
-        (name = "entity-dashboard", description = "Private entity dashboard - wallet authentication required"),
+        (name = "entitati-straine", description = "Firme cu filiale in Romania")
     ),
     info(
         title = "Entity Management Service",

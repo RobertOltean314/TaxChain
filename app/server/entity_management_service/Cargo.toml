@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 actix-web = { workspace = true }
+actix-cors = "0.7"
 tokio = { workspace = true }
 serde = { workspace = true }
 sqlx = { workspace = true }
@@ -18,3 +19,4 @@ validator = { workspace = true }
 utoipa = { workspace = true, features = ["actix_extras", "chrono", "macros", "uuid"] }
 utoipa-swagger-ui = { workspace = true }
 utoipa-scalar = { workspace = true }
+futures-util = "0.3.31"

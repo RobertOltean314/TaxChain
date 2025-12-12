@@ -1,11 +1,13 @@
 use crate::models::{EntitateStraina, InstitutiePublica, Ong, PersoanaFizica, PersoanaJuridica};
 use chrono::NaiveDate;
 
+#[allow(dead_code)]
 pub struct InregistrareFiscala {
     contribuabil: Contribuabil,
     obligatii: ObligatiiFiscale,
 }
 
+#[allow(dead_code)]
 pub enum Contribuabil {
     PersoanaFizica(PersoanaFizica),
     PersoanaJuridica(PersoanaJuridica),
@@ -15,6 +17,7 @@ pub enum Contribuabil {
     Other(String),
 }
 
+#[allow(dead_code)]
 pub struct ObligatiiFiscale {
     impozit_pe_venit: bool,
     cas: bool,
@@ -24,6 +27,7 @@ pub struct ObligatiiFiscale {
 }
 
 // To take a closer look on this one
+#[allow(dead_code)]
 pub struct PersoanaFizicaConformANAF {
     pub denumire_platitor: String,
     pub adresa: String,

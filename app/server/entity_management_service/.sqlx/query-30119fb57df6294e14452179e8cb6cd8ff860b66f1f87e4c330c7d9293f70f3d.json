@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            uuid::TEXT AS \"uuid!\",\n            'persoana_fizica' AS \"entity_type!\",\n            CONCAT(nume, ' ', prenume) AS \"name!\",\n            stare_fiscala::TEXT AS \"stare_fiscala!\",\n            created_at::TEXT AS \"created_at!\"\n        FROM persoane_fizice\n        WHERE owner_wallet_address = $1\n        ORDER BY created_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uuid!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "stare_fiscala!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "30119fb57df6294e14452179e8cb6cd8ff860b66f1f87e4c330c7d9293f70f3d"
+}

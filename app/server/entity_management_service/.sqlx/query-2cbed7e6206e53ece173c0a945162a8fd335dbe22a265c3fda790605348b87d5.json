@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE persoane_fizice \n        SET \n            tip = $2,\n            cnp_hash = $3,\n            nume = $4,\n            prenume = $5,\n            serie_act_identitate = $6,\n            numar_act_identitate = $7,\n            data_nasterii = $8,\n            cetatenie = $9,\n            dovada_drept_folosinta = $10,\n            cod_caen = $11,\n            data_inregistrarii = $12,\n            euid = $13,\n            nr_ordine_reg_comert = $14,\n            platitor_tva = $15,\n            stare_fiscala = $16,\n            inregistrat_in_spv = $17,\n            updated_at = NOW()\n        WHERE uuid = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "tip_persoana_fizica",
+            "kind": {
+              "Enum": [
+                "PFA",
+                "II",
+                "IF"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Date",
+        "Text",
+        {
+          "Custom": {
+            "name": "tip_dovada",
+            "kind": {
+              "Enum": [
+                "contract_de_proprietate",
+                "contract_de_comodat",
+                "contract_de_inchiriere",
+                "alte_tipuri"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Date",
+        "Text",
+        "Text",
+        "Bool",
+        {
+          "Custom": {
+            "name": "stare_fiscala",
+            "kind": {
+              "Enum": [
+                "activ",
+                "inactiv",
+                "suspendat",
+                "radiat"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2cbed7e6206e53ece173c0a945162a8fd335dbe22a265c3fda790605348b87d5"
+}

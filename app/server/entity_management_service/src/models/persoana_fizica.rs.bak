@@ -15,7 +15,6 @@ use validator::Validate;
 #[schema(as = models::PersoanaFizica)]
 pub struct PersoanaFizica {
     pub uuid: Uuid,
-    pub owner_wallet_address: Option<String>,
 
     pub tip: TipPersoanaFizica,
     pub reprezentant_uuid: Uuid,
@@ -48,7 +47,7 @@ pub struct PersoanaFizica {
 }
 
 // TODO: Implement validations for all fields
-#[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Serialize, Deserialize, Validate, ToSchema)]
 #[schema(as = models::PersoanaFizicaRequest)]
 pub struct PersoanaFizicaRequest {
     pub tip: TipPersoanaFizica,
@@ -87,14 +86,12 @@ pub struct PersoanaFizicaRequest {
     pub platitor_tva: bool,
     pub stare_fiscala: StareFiscala,
     pub inregistrat_in_spv: bool,
-    pub owner_wallet_address: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
 #[schema(as = models::PersoanaFizicaResponse)]
 pub struct PersoanaFizicaResponse {
     pub uuid: Uuid,
-    pub owner_wallet_address: Option<String>,
     pub tip: String,
     pub nume: String,
     pub prenume: String,

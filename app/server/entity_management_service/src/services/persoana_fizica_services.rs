@@ -37,7 +37,8 @@ pub async fn get_all_persoane_fizice(
             platitor_tva,
             stare_fiscala::TEXT AS "stare_fiscala!",
             inregistrat_in_spv,
-            created_at
+            created_at,
+            owner_wallet_address
         FROM persoane_fizice
         ORDER BY uuid ASC 
         "#,
@@ -151,6 +152,7 @@ pub async fn get_all_persoane_fizice(
             stare_fiscala: persoana.stare_fiscala,
             inregistrat_in_spv: persoana.inregistrat_in_spv,
             created_at: Some(persoana.created_at.unwrap_or_else(|| chrono::Utc::now())),
+            owner_wallet_address: persoana.owner_wallet_address,
         });
     }
 
@@ -180,7 +182,8 @@ pub async fn get_persoana_fizica_by_id(
             platitor_tva,
             stare_fiscala::TEXT AS "stare_fiscala!",
             inregistrat_in_spv,
-            created_at
+            created_at,
+            owner_wallet_address
         FROM persoane_fizice
         WHERE uuid = $1
         "#,
@@ -293,6 +296,7 @@ pub async fn get_persoana_fizica_by_id(
         stare_fiscala: persoana.stare_fiscala,
         inregistrat_in_spv: persoana.inregistrat_in_spv,
         created_at: Some(persoana.created_at.unwrap_or_else(|| chrono::Utc::now())),
+        owner_wallet_address: persoana.owner_wallet_address,
     };
 
     Ok(response)
@@ -302,7 +306,9 @@ pub async fn create_new_persoana_fizica(
     body: Json<PersoanaFizicaRequest>,
     pool: Data<PgPool>,
 ) -> Result<HttpResponse, Error> {
+    eprintln!("=== CREATE PERSOANA FIZICA REQUEST RECEIVED ===");
     let request = body.into_inner();
+    eprintln!("Request data: {:?}", request);
 
     let mut tx = match pool.begin().await {
         Ok(tx) => tx,
@@ -424,6 +430,7 @@ pub async fn create_new_persoana_fizica(
         inregistrat_in_spv: request.inregistrat_in_spv,
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        owner_wallet_address: None,
     };
 
     let result = sqlx::query!(
@@ -489,10 +496,23 @@ pub async fn create_new_persoana_fizica(
             Ok(HttpResponse::Created().json(new_persoana_fizica))
         }
         Err(sqlx::Error::Database(db_err))
-            if db_err.constraint() == Some("persoana_fizica_cnp_key") =>
+            if db_err.constraint() == Some("persoane_fizice_cnp_hash_key") =>
         {
             let _ = tx.rollback().await;
             Ok(HttpResponse::Conflict().body("CNP-ul există deja în sistem"))
+        }
+        Err(sqlx::Error::Database(db_err))
+            if db_err.constraint() == Some("persoane_fizice_euid_key") =>
+        {
+            let _ = tx.rollback().await;
+            Ok(HttpResponse::Conflict().body("EUID-ul există deja în sistem"))
+        }
+        Err(sqlx::Error::Database(db_err))
+            if db_err.constraint() == Some("persoane_fizice_nr_ordine_reg_comert_key") =>
+        {
+            let _ = tx.rollback().await;
+            Ok(HttpResponse::Conflict()
+                .body("Numărul de ordine la Registrul Comerțului există deja în sistem"))
         }
         Err(err) => {
             eprintln!("Database error inserting persoana_fizica: {:?}", err);

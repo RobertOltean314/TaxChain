@@ -1,11 +1,8 @@
 use actix_web::{
     HttpResponse, Responder, delete, get, post, put,
-    web::{Data, Json, Path},
 };
 
-use sqlx::PgPool;
 use utoipa;
-use uuid::Uuid;
 
 use crate::models::ong::{OngRequest, OngResponse};
 

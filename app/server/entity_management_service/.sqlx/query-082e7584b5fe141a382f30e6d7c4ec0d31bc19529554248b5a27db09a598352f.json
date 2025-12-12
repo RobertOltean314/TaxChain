@@ -1,0 +1,110 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            uuid,\n            tip::TEXT AS \"tip!\",\n            nume,\n            prenume,\n            serie_act_identitate,\n            numar_act_identitate,\n            data_nasterii,\n            cetatenie,\n            adresa_domiciliu_uuid,\n            reprezentant_uuid,\n            cod_caen,\n            platitor_tva,\n            stare_fiscala::TEXT AS \"stare_fiscala!\",\n            inregistrat_in_spv,\n            created_at,\n            owner_wallet_address\n        FROM persoane_fizice\n        ORDER BY uuid ASC \n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tip!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "nume",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "prenume",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "serie_act_identitate",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "numar_act_identitate",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "data_nasterii",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 7,
+        "name": "cetatenie",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "adresa_domiciliu_uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "reprezentant_uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 10,
+        "name": "cod_caen",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "platitor_tva",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 12,
+        "name": "stare_fiscala!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "inregistrat_in_spv",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 14,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "owner_wallet_address",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      null,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "082e7584b5fe141a382f30e6d7c4ec0d31bc19529554248b5a27db09a598352f"
+}

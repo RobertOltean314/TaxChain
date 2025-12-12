@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE reprezentanti \n        SET \n            nume = $2,\n            prenume = $3,\n            cnp = $4,\n            tip_act_identitate = $5,\n            serie_act_identitate = $6,\n            numar_act_identitate = $7,\n            calitate = $8,\n            telefon = $9,\n            email = $10,\n            data_nasterii = $11,\n            adresa_domiciliu = $12,\n            updated_at = NOW()\n        WHERE uuid = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "tip_act_identitate",
+            "kind": {
+              "Enum": [
+                "carte_identitate",
+                "pasaport",
+                "permis_de_conducere"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "calitate_reprezentant",
+            "kind": {
+              "Enum": [
+                "proprietar",
+                "administrator",
+                "mandatar",
+                "alt_reprezentant"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Text",
+        "Date",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c5adc28e17d87e9cd32680825e311e612976841e2a2304f076a47c17cddc6657"
+}

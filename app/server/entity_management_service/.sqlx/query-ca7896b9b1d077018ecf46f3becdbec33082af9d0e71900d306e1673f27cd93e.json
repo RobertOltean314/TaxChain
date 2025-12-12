@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            uuid::TEXT AS \"uuid!\",\n            'persoana_fizica' AS \"entity_type!\",\n            CONCAT(nume, ' ', prenume) AS \"name!\",\n            NULL AS \"fiscal_code\",\n            created_at::TEXT AS \"registration_date\",\n            stare_fiscala::TEXT AS \"stare_fiscala!\"\n        FROM persoane_fizice\n        WHERE \n            (LOWER(nume) LIKE LOWER($1) OR LOWER(prenume) LIKE LOWER($1) OR $1 = '')\n            AND ($2::TEXT IS NULL OR 'persoana_fizica' = $2)\n        ORDER BY created_at DESC\n        LIMIT $3 OFFSET $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uuid!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "fiscal_code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "registration_date",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "stare_fiscala!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ca7896b9b1d077018ecf46f3becdbec33082af9d0e71900d306e1673f27cd93e"
+}

@@ -1,5 +1,6 @@
 mod handlers;
 mod helpers;
+mod middleware;
 mod models;
 mod openapi;
 mod repository;
@@ -7,6 +8,7 @@ mod routes;
 mod services;
 
 use crate::repository::database_connection::create_pool;
+use actix_cors::Cors;
 use actix_web::{App, HttpResponse, HttpServer, web};
 use std::env;
 use utoipa::OpenApi;
@@ -26,7 +28,7 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| "8080".to_string())
         .parse()
         .unwrap();
-    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.0".to_string());
+    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 
     println!("Entity Management Service running");
     println!("   • API:        http://{}:{}/api/…", host, port);
@@ -37,7 +39,18 @@ async fn main() -> std::io::Result<()> {
     );
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("http://localhost:4200")
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+            .allowed_headers(vec![
+                actix_web::http::header::AUTHORIZATION,
+                actix_web::http::header::ACCEPT,
+                actix_web::http::header::CONTENT_TYPE,
+            ])
+            .max_age(3600);
+
         App::new()
+            .wrap(cors)
             .app_data(web::Data::new(pool.clone()))
             .route(
                 "/api-docs/openapi.json",
@@ -48,7 +61,11 @@ async fn main() -> std::io::Result<()> {
                 }),
             )
             .service(Scalar::with_url("/docs", openapi::ApiDoc::openapi()))
-            .service(web::scope("/api").service(routes::persoana_fizica_routes()))
+            .service(
+                web::scope("/api")
+                    .service(routes::persoana_fizica_routes())
+                    .service(routes::entity_routes()),
+            )
     })
     .bind((host.as_str(), port))?
     .run()

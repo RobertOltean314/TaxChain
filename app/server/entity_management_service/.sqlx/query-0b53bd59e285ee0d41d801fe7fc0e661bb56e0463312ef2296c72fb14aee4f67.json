@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT uuid, tara, judet, localitate, cod_postal, strada, numar,\n                   bloc, scara, etaj, apartament, detalii\n            FROM address\n            WHERE uuid = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tara",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "judet",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "localitate",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "cod_postal",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "strada",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "numar",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "bloc",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "scara",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "etaj",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "apartament",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "detalii",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "0b53bd59e285ee0d41d801fe7fc0e661bb56e0463312ef2296c72fb14aee4f67"
+}

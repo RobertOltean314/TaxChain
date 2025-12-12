@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE address \n        SET \n            tara = $2,\n            judet = $3,\n            localitate = $4,\n            cod_postal = $5,\n            strada = $6,\n            numar = $7,\n            bloc = $8,\n            scara = $9,\n            etaj = $10,\n            apartament = $11,\n            updated_at = NOW()\n        WHERE uuid = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dcaf15d32ac424cbb229cce331463dcc129e2a86698a6ed0e088113024d3dec6"
+}

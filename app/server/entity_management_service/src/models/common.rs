@@ -93,7 +93,7 @@ pub struct AdresaResponse {
     pub detalii: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ReprezentantRequest {
     pub parent_id: Uuid,
     pub parent_type: String,
