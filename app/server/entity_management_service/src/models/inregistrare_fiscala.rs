@@ -23,6 +23,7 @@ pub struct ObligatiiFiscale {
     alte_obligatii: String,
 }
 
+// To take a closer look on this one
 pub struct PersoanaFizicaConformANAF {
     pub denumire_platitor: String,
     pub adresa: String,

@@ -1,9 +1,10 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
 pub struct Address {
     pub tara: String,
     pub judet: String,
@@ -17,7 +18,7 @@ pub struct Address {
     pub apartament: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
 pub struct Reprezentant {
     pub uuid: Uuid,
 
@@ -41,7 +42,7 @@ pub struct Reprezentant {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
+#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "tip_act_identitate", rename_all = "snake_case")]
 pub enum TipActIdentitate {
     CarteIdentitate,
@@ -49,7 +50,7 @@ pub enum TipActIdentitate {
     PermisDeConducere,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
+#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "calitate_reprezentant", rename_all = "snake_case")]
 pub enum CalitateReprezentant {
     Proprietar,
@@ -58,7 +59,7 @@ pub enum CalitateReprezentant {
     AlteCalitati,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
+#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "tip_dovada", rename_all = "snake_case")]
 pub enum TipDovada {
     ContractDeProprietate,
@@ -67,7 +68,7 @@ pub enum TipDovada {
     AlteTipuri,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
+#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "stare_fiscala", rename_all = "snake_case")]
 pub enum StareFiscala {
     Activ,
@@ -76,7 +77,7 @@ pub enum StareFiscala {
     Radiat,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct AdresaResponse {
     pub uuid: Uuid,
     pub tara: String,
@@ -92,7 +93,7 @@ pub struct AdresaResponse {
     pub detalii: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ReprezentantRequest {
     pub parent_id: Uuid,
     pub parent_type: String,
@@ -109,7 +110,7 @@ pub struct ReprezentantRequest {
     pub adresa_domiciliu: Uuid,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ReprezentantResponse {
     pub uuid: Uuid,
     pub nume: String,

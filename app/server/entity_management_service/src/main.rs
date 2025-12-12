@@ -1,42 +1,59 @@
 mod handlers;
 mod helpers;
 mod models;
+mod openapi;
 mod repository;
 mod routes;
 mod services;
 
-use std::env;
-
-use actix_web::{App, HttpServer, web};
-
 use crate::repository::database_connection::create_pool;
+use actix_web::{App, HttpResponse, HttpServer, web};
+use std::env;
+use utoipa::OpenApi;
+use utoipa_scalar::{Scalar, Servable}; // ← needed for .with_url()
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
-
     let pool = create_pool().await;
 
     sqlx::migrate!("./migrations")
         .run(&pool)
         .await
-        .expect("Failed to run database migrations");
+        .expect("Migrations failed");
 
-    let port = env::var("PORT")
+    let port: u16 = env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())
         .parse()
-        .expect("PORT must have a valid number");
-    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        .unwrap();
+    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.0".to_string());
 
-    println!("Starting Entity Management Service...");
-    println!("Server running at http://{}:{}", host, port);
+    println!("Entity Management Service running");
+    println!("   • API:        http://{}:{}/api/…", host, port);
+    println!("   • Docs UI:    http://{}:{}/docs", host, port);
+    println!(
+        "   • OpenAPI:    http://{}:{}/api-docs/openapi.json",
+        host, port
+    );
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
+            // OpenAPI JSON endpoint
+            .route(
+                "/api-docs/openapi.json",
+                web::get().to(|| async {
+                    HttpResponse::Ok()
+                        .content_type("application/json")
+                        .body(openapi::ApiDoc::openapi().to_pretty_json().unwrap())
+                }),
+            )
+            // Scalar UI at /docs ← THIS WORKS 100%
+            .service(Scalar::with_url("/docs", openapi::ApiDoc::openapi()))
+            // Your actual routes
             .service(web::scope("/api").service(routes::persoana_fizica_routes()))
     })
-    .bind(("127.0.0.1", port))?
+    .bind((host.as_str(), port))?
     .run()
     .await
 }

@@ -7,10 +7,12 @@ use sqlx::{
     FromRow,
     types::chrono::{DateTime, Utc},
 };
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, ToSchema)]
+#[schema(as = models::PersoanaFizica)]
 pub struct PersoanaFizica {
     pub uuid: Uuid,
 
@@ -45,7 +47,8 @@ pub struct PersoanaFizica {
 }
 
 // TODO: Implement validations for all fields
-#[derive(Serialize, Deserialize, Validate)]
+#[derive(Serialize, Deserialize, Validate, ToSchema)]
+#[schema(as = models::PersoanaFizicaRequest)]
 pub struct PersoanaFizicaRequest {
     pub tip: TipPersoanaFizica,
     #[validate(length(
@@ -85,7 +88,8 @@ pub struct PersoanaFizicaRequest {
     pub inregistrat_in_spv: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
+#[schema(as = models::PersoanaFizicaResponse)]
 pub struct PersoanaFizicaResponse {
     pub uuid: Uuid,
     pub tip: String,
@@ -106,7 +110,7 @@ pub struct PersoanaFizicaResponse {
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type)]
+#[derive(Deserialize, Serialize, Debug, Clone, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "tip_persoana_fizica", rename_all = "UPPERCASE")]
 pub enum TipPersoanaFizica {
     PFA,

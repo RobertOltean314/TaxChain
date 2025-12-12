@@ -1,6 +1,8 @@
 use sqlx::types::chrono::{DateTime, Utc};
+use utoipa::ToSchema;
 
 use crate::models::common::{Address, Reprezentant, StareFiscala};
+#[derive(ToSchema)]
 pub struct PersoanaJuridica {
     pub cui: String,
     pub denumire: String,
@@ -17,3 +19,7 @@ pub struct PersoanaJuridica {
     pub data_inregistrare: DateTime<Utc>,
     pub euid: Option<String>,
 }
+#[derive(ToSchema)]
+pub struct PersoanaJuridicaRequest {}
+#[derive(ToSchema)]
+pub struct PersoanaJuridicaResponse {}

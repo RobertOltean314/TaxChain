@@ -1,0 +1,586 @@
+<div class="entity-management-container">
+  <div class="header">
+    <h1 class="title">Persoana Fizica Management</h1>
+    <p class="subtitle">
+      Create, Read, Update, and Delete entities (PFA, II, IF)
+    </p>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-buttons">
+    <button
+      type="button"
+      class="btn btn-secondary"
+      (click)="onLoadById()"
+      [disabled]="isLoading"
+    >
+      <svg
+        class="btn-icon"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        ></path>
+      </svg>
+      Load by ID
+    </button>
+    <button
+      type="button"
+      class="btn btn-warning"
+      (click)="resetForm()"
+      [disabled]="isLoading"
+    >
+      <svg
+        class="btn-icon"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 4v16m8-8H4"
+        ></path>
+      </svg>
+      New Entity
+    </button>
+    <button
+      type="button"
+      class="btn btn-danger"
+      (click)="deleteEntity()"
+      [disabled]="!isEditMode || isLoading"
+    >
+      <svg
+        class="btn-icon"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+        ></path>
+      </svg>
+      Delete
+    </button>
+  </div>
+
+  <!-- Messages -->
+  <div *ngIf="successMessage" class="alert alert-success">
+    <svg
+      class="alert-icon"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      ></path>
+    </svg>
+    {{ successMessage }}
+  </div>
+
+  <div *ngIf="errorMessage" class="alert alert-error">
+    <svg
+      class="alert-icon"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+      ></path>
+    </svg>
+    {{ errorMessage }}
+  </div>
+
+  <!-- Form -->
+  <form [formGroup]="entityForm" (ngSubmit)="onSubmit()" class="entity-form">
+    <!-- Basic Information Section -->
+    <div class="form-section">
+      <h2 class="section-title">Basic Information</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="tip">Type *</label>
+          <select id="tip" formControlName="tip" class="form-control">
+            <option *ngFor="let tip of TipPersoanaFizica" [value]="tip">
+              {{ tip }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="cnp">CNP *</label>
+          <input
+            type="text"
+            id="cnp"
+            formControlName="cnp"
+            class="form-control"
+            placeholder="1234567890123"
+            maxlength="13"
+          />
+          <span
+            class="error-text"
+            *ngIf="
+              entityForm.get('cnp')?.invalid && entityForm.get('cnp')?.touched
+            "
+          >
+            CNP must be exactly 13 characters
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label for="nume">Last Name *</label>
+          <input
+            type="text"
+            id="nume"
+            formControlName="nume"
+            class="form-control"
+            placeholder="Popescu"
+          />
+          <span
+            class="error-text"
+            *ngIf="
+              entityForm.get('nume')?.invalid && entityForm.get('nume')?.touched
+            "
+          >
+            Last name is required (3-14 characters)
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label for="prenume">First Name *</label>
+          <input
+            type="text"
+            id="prenume"
+            formControlName="prenume"
+            class="form-control"
+            placeholder="Ion"
+          />
+          <span
+            class="error-text"
+            *ngIf="
+              entityForm.get('prenume')?.invalid &&
+              entityForm.get('prenume')?.touched
+            "
+          >
+            First name is required (3-14 characters)
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label for="serie_act_identitate">ID Card Series *</label>
+          <input
+            type="text"
+            id="serie_act_identitate"
+            formControlName="serie_act_identitate"
+            class="form-control"
+            placeholder="AB"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="numar_act_identitate">ID Card Number *</label>
+          <input
+            type="text"
+            id="numar_act_identitate"
+            formControlName="numar_act_identitate"
+            class="form-control"
+            placeholder="123456"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="data_nasterii">Date of Birth *</label>
+          <input
+            type="date"
+            id="data_nasterii"
+            formControlName="data_nasterii"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="cetatenie">Citizenship *</label>
+          <input
+            type="text"
+            id="cetatenie"
+            formControlName="cetatenie"
+            class="form-control"
+            placeholder="Romania"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Address Section -->
+    <div class="form-section">
+      <h2 class="section-title">Address Information</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="adresa_tara">Country *</label>
+          <input
+            type="text"
+            id="adresa_tara"
+            formControlName="adresa_tara"
+            class="form-control"
+            placeholder="Romania"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_judet">County *</label>
+          <input
+            type="text"
+            id="adresa_judet"
+            formControlName="adresa_judet"
+            class="form-control"
+            placeholder="Bucuresti"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_localitate">City *</label>
+          <input
+            type="text"
+            id="adresa_localitate"
+            formControlName="adresa_localitate"
+            class="form-control"
+            placeholder="Bucuresti"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_cod_postal">Postal Code</label>
+          <input
+            type="text"
+            id="adresa_cod_postal"
+            formControlName="adresa_cod_postal"
+            class="form-control"
+            placeholder="010101"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_strada">Street *</label>
+          <input
+            type="text"
+            id="adresa_strada"
+            formControlName="adresa_strada"
+            class="form-control"
+            placeholder="Calea Victoriei"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_numar">Number *</label>
+          <input
+            type="text"
+            id="adresa_numar"
+            formControlName="adresa_numar"
+            class="form-control"
+            placeholder="10"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_bloc">Building</label>
+          <input
+            type="text"
+            id="adresa_bloc"
+            formControlName="adresa_bloc"
+            class="form-control"
+            placeholder="A1"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_scara">Staircase</label>
+          <input
+            type="text"
+            id="adresa_scara"
+            formControlName="adresa_scara"
+            class="form-control"
+            placeholder="1"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_etaj">Floor</label>
+          <input
+            type="text"
+            id="adresa_etaj"
+            formControlName="adresa_etaj"
+            class="form-control"
+            placeholder="2"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="adresa_apartament">Apartment</label>
+          <input
+            type="text"
+            id="adresa_apartament"
+            formControlName="adresa_apartament"
+            class="form-control"
+            placeholder="5"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="dovada_drept_folosinta">Proof of Residence</label>
+          <select
+            id="dovada_drept_folosinta"
+            formControlName="dovada_drept_folosinta"
+            class="form-control"
+          >
+            <option [ngValue]="null">Select...</option>
+            <option *ngFor="let tip of TipDovada" [value]="tip">
+              {{ tip }}
+            </option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Representative Section -->
+    <div class="form-section">
+      <h2 class="section-title">Representative Information</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="reprezentant_nume">Last Name *</label>
+          <input
+            type="text"
+            id="reprezentant_nume"
+            formControlName="reprezentant_nume"
+            class="form-control"
+            placeholder="Ionescu"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_prenume">First Name *</label>
+          <input
+            type="text"
+            id="reprezentant_prenume"
+            formControlName="reprezentant_prenume"
+            class="form-control"
+            placeholder="Maria"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_cnp">CNP *</label>
+          <input
+            type="text"
+            id="reprezentant_cnp"
+            formControlName="reprezentant_cnp"
+            class="form-control"
+            placeholder="2345678901234"
+            maxlength="13"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_tip_act">ID Type *</label>
+          <select
+            id="reprezentant_tip_act"
+            formControlName="reprezentant_tip_act"
+            class="form-control"
+          >
+            <option *ngFor="let tip of TipActIdentitate" [value]="tip">
+              {{ tip }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_serie_act">ID Series *</label>
+          <input
+            type="text"
+            id="reprezentant_serie_act"
+            formControlName="reprezentant_serie_act"
+            class="form-control"
+            placeholder="CD"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_numar_act">ID Number *</label>
+          <input
+            type="text"
+            id="reprezentant_numar_act"
+            formControlName="reprezentant_numar_act"
+            class="form-control"
+            placeholder="789012"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_calitate">Role *</label>
+          <select
+            id="reprezentant_calitate"
+            formControlName="reprezentant_calitate"
+            class="form-control"
+          >
+            <option
+              *ngFor="let calitate of CalitateReprezentant"
+              [value]="calitate"
+            >
+              {{ calitate }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_telefon">Phone *</label>
+          <input
+            type="tel"
+            id="reprezentant_telefon"
+            formControlName="reprezentant_telefon"
+            class="form-control"
+            placeholder="+40712345678"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_email">Email *</label>
+          <input
+            type="email"
+            id="reprezentant_email"
+            formControlName="reprezentant_email"
+            class="form-control"
+            placeholder="email@example.com"
+          />
+          <span
+            class="error-text"
+            *ngIf="
+              entityForm.get('reprezentant_email')?.invalid &&
+              entityForm.get('reprezentant_email')?.touched
+            "
+          >
+            Valid email is required
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label for="reprezentant_data_nasterii">Date of Birth *</label>
+          <input
+            type="date"
+            id="reprezentant_data_nasterii"
+            formControlName="reprezentant_data_nasterii"
+            class="form-control"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Tax Information Section -->
+    <div class="form-section">
+      <h2 class="section-title">Tax Information</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="cod_caen">CAEN Code</label>
+          <input
+            type="text"
+            id="cod_caen"
+            formControlName="cod_caen"
+            class="form-control"
+            placeholder="6201"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="data_inregistrarii">Registration Date</label>
+          <input
+            type="date"
+            id="data_inregistrarii"
+            formControlName="data_inregistrarii"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="euid">EUID</label>
+          <input
+            type="text"
+            id="euid"
+            formControlName="euid"
+            class="form-control"
+            placeholder="ROONRC.J40/1234/2024"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="nr_ordine_reg_comert">Trade Register Number</label>
+          <input
+            type="text"
+            id="nr_ordine_reg_comert"
+            formControlName="nr_ordine_reg_comert"
+            class="form-control"
+            placeholder="J40/1234/2024"
+          />
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              formControlName="platitor_tva"
+              class="checkbox-input"
+            />
+            <span>VAT Payer</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label for="stare_fiscala">Tax Status *</label>
+          <select
+            id="stare_fiscala"
+            formControlName="stare_fiscala"
+            class="form-control"
+          >
+            <option *ngFor="let stare of StareFiscala" [value]="stare">
+              {{ stare }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              formControlName="inregistrat_in_spv"
+              class="checkbox-input"
+            />
+            <span>Registered in SPV</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit Button -->
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" [disabled]="isLoading">
+        <span *ngIf="!isLoading">{{
+          isEditMode ? "Update Entity" : "Create Entity"
+        }}</span>
+        <span *ngIf="isLoading" class="loading-spinner">Processing...</span>
+      </button>
+    </div>
+  </form>
+</div>

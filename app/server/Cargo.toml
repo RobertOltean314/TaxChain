@@ -18,4 +18,7 @@ dotenvy = { version = "0.15.0" }
 serde_json = { version = "1.0.145" }
 log = { version = "0.4.28" }
 sha2 = { version = "0.10.9" }
-validator = { version = "0.20.0" }
+validator = { version = "0.20.0", features = ["derive"] }
+utoipa = { version = "5.4.0", features = ["actix_extras", "macros"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
+utoipa-scalar = { version = "0.3.0", features = ["actix-web"] }
