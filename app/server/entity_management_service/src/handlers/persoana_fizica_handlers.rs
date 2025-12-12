@@ -4,7 +4,7 @@ use actix_web::{
 };
 
 use sqlx::PgPool;
-use utoipa;
+use utoipa::{self};
 use uuid::Uuid;
 
 use crate::{
@@ -22,8 +22,13 @@ use crate::{
     )
 )]
 #[get("")]
-pub async fn get_all_persoane_fizice(_pool: Data<PgPool>) -> impl Responder {
-    HttpResponse::NotImplemented().body("Must implement this function")
+pub async fn get_all_persoane_fizice(pool: Data<PgPool>) -> impl Responder {
+    match services::get_all_persoane_fizice(pool).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(error) => {
+            HttpResponse::NotFound().body(format!("Persoana_fizica not found: {:?}", error))
+        }
+    }
 }
 
 #[utoipa::path(

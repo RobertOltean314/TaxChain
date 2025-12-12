@@ -17,6 +17,146 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+pub async fn get_all_persoane_fizice(
+    pool: web::Data<PgPool>,
+) -> Result<Vec<PersoanaFizicaResponse>, HttpResponse> {
+    let persoane_result = sqlx::query!(
+        r#"
+        SELECT 
+            uuid,
+            tip::TEXT AS "tip!",
+            nume,
+            prenume,
+            serie_act_identitate,
+            numar_act_identitate,
+            data_nasterii,
+            cetatenie,
+            adresa_domiciliu_uuid,
+            reprezentant_uuid,
+            cod_caen,
+            platitor_tva,
+            stare_fiscala::TEXT AS "stare_fiscala!",
+            inregistrat_in_spv,
+            created_at
+        FROM persoane_fizice
+        ORDER BY uuid ASC 
+        "#,
+    )
+    .fetch_all(&**pool)
+    .await;
+
+    let persoane = match persoane_result {
+        Ok(p) => p,
+        Err(e) => {
+            log::error!("Eroare DB persoane: {:?}", e);
+            return Err(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Eroare internă de server"
+            })));
+        }
+    };
+
+    let mut responses = Vec::new();
+
+    for persoana in persoane {
+        let adresa_result = sqlx::query!(
+            r#"
+            SELECT uuid, tara, judet, localitate, cod_postal, strada, numar,
+                   bloc, scara, etaj, apartament, detalii
+            FROM address
+            WHERE uuid = $1
+            "#,
+            persoana.adresa_domiciliu_uuid
+        )
+        .fetch_one(&**pool)
+        .await;
+
+        let adresa = match adresa_result {
+            Ok(a) => AdresaResponse {
+                uuid: a.uuid,
+                tara: a.tara,
+                judet: a.judet,
+                localitate: a.localitate,
+                cod_postal: a.cod_postal,
+                strada: a.strada,
+                numar: a.numar,
+                bloc: a.bloc,
+                scara: a.scara,
+                etaj: a.etaj,
+                apartament: a.apartament,
+                detalii: a.detalii,
+            },
+            Err(e) => {
+                log::error!(
+                    "Eroare DB adresa pentru persoana {}: {:?}",
+                    persoana.uuid,
+                    e
+                );
+                continue;
+            }
+        };
+
+        let reprezentant_result = sqlx::query!(
+            r#"
+            SELECT 
+                uuid,
+                nume,
+                prenume,
+                telefon,
+                email,
+                calitate as "calitate!: CalitateReprezentant",
+                adresa_domiciliu,
+                created_at
+            FROM reprezentanti
+            WHERE uuid = $1
+            "#,
+            persoana.reprezentant_uuid
+        )
+        .fetch_one(&**pool)
+        .await;
+
+        let reprezentant = match reprezentant_result {
+            Ok(r) => ReprezentantResponse {
+                uuid: r.uuid,
+                nume: r.nume,
+                prenume: r.prenume,
+                telefon: r.telefon,
+                email: r.email,
+                calitate: r.calitate,
+                adresa_domiciliu: r.adresa_domiciliu,
+                created_at: r.created_at.unwrap_or_else(|| chrono::Utc::now()),
+            },
+            Err(e) => {
+                log::error!(
+                    "Eroare DB reprezentant pentru persoana {}: {:?}",
+                    persoana.uuid,
+                    e
+                );
+                continue;
+            }
+        };
+
+        responses.push(PersoanaFizicaResponse {
+            uuid: persoana.uuid,
+            tip: persoana.tip,
+            nume: persoana.nume,
+            prenume: persoana.prenume,
+            serie_act_identitate: persoana.serie_act_identitate,
+            numar_act_identitate: persoana.numar_act_identitate,
+            data_nasterii: persoana.data_nasterii,
+            cetatenie: persoana.cetatenie,
+            adresa_domiciliu: adresa,
+            reprezentant,
+            cod_caen: persoana.cod_caen,
+            platitor_tva: persoana.platitor_tva,
+            stare_fiscala: persoana.stare_fiscala,
+            inregistrat_in_spv: persoana.inregistrat_in_spv,
+            created_at: Some(persoana.created_at.unwrap_or_else(|| chrono::Utc::now())),
+        });
+    }
+
+    Ok(responses)
+}
+
 pub async fn get_persoana_fizica_by_id(
     path: web::Path<Uuid>,
     pool: web::Data<PgPool>,

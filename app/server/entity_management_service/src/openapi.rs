@@ -1,5 +1,4 @@
 use utoipa::OpenApi;
-use utoipa::openapi;
 
 use crate::handlers::entitate_straina_handlers::*;
 use crate::handlers::institutie_publica_handlers::*;
@@ -94,7 +93,7 @@ use crate::models::persoana_juridica::{
     tags(
         (name = "persoane-fizice", description="Persoane Fizice Autorizate (PFA), Intreprinderi Individuale (II) sau Intreprinderi Familiale (IF)"),
         (name = "persoane-juridice", description = "Societate cu raspundere Limitata (STR), Intreprinderi Mici si Mijlocii (IMM)"),
-        (name = "ong", description = "Organizatii Non-Guvernamentale (ONGs)"),
+        (name = "ongs", description = "Organizatii Non-Guvernamentale (ONGs)"),
         (name = "institutii-publice", description = "Insstitutii Guvernamentale, Primarii, Scoli, Spitale, etc"),
         (name = "entitati-straine", description = "Firme cu filiale in Romania")
     ),

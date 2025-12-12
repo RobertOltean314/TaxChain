@@ -39,7 +39,6 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            // OpenAPI JSON endpoint
             .route(
                 "/api-docs/openapi.json",
                 web::get().to(|| async {
@@ -48,9 +47,7 @@ async fn main() -> std::io::Result<()> {
                         .body(openapi::ApiDoc::openapi().to_pretty_json().unwrap())
                 }),
             )
-            // Scalar UI at /docs ← THIS WORKS 100%
             .service(Scalar::with_url("/docs", openapi::ApiDoc::openapi()))
-            // Your actual routes
             .service(web::scope("/api").service(routes::persoana_fizica_routes()))
     })
     .bind((host.as_str(), port))?
