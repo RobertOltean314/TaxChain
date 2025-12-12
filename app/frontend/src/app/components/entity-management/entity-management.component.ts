@@ -1,12 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import {
-  CardComponent,
-  CardHeaderComponent,
-  CardTitleComponent,
-  CardContentComponent,
-} from '../../shared/ui/card/card.component';
 import { PersoanaFizicaFormComponent } from './forms/persoana-fizica-form/persoana-fizica-form.component';
 import { PersoanaJuridicaFormComponent } from './forms/persoana-juridica-form/persoana-juridica-form.component';
 import { OngFormComponent } from './forms/ong-form/ong-form.component';
@@ -26,10 +20,6 @@ interface EntityTypeOption {
   imports: [
     CommonModule,
     FormsModule,
-    CardComponent,
-    CardHeaderComponent,
-    CardTitleComponent,
-    CardContentComponent,
     PersoanaFizicaFormComponent,
     PersoanaJuridicaFormComponent,
     OngFormComponent,

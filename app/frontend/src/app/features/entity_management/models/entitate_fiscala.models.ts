@@ -79,6 +79,9 @@ export interface PersoanaFizicaRequest {
   platitor_tva: boolean;
   stare_fiscala: StareFiscala;
   inregistrat_in_spv: boolean;
+  // MultiversX wallet integration
+  owner_wallet_address: string; // Personal wallet that created this entity
+  entity_wallet_address?: string; // Optional separate wallet for entity operations
 }
 
 export interface AdresaResponse {
@@ -138,6 +141,9 @@ export interface PersoanaJuridicaRequest {
   platitor_tva: boolean;
   stare_fiscala: StareFiscala;
   data_infiintarii: string;
+  // MultiversX wallet integration
+  owner_wallet_address: string; // Personal wallet that created this entity
+  entity_wallet_address?: string; // Optional separate wallet for entity operations
 }
 
 export interface PersoanaJuridicaResponse {
@@ -172,6 +178,9 @@ export interface ONGRequest {
   domeniu_activitate: string;
   data_infiintarii: string;
   statut_utilitate_publica: boolean;
+  // MultiversX wallet integration
+  owner_wallet_address: string; // Personal wallet that created this entity
+  entity_wallet_address?: string; // Optional separate wallet for entity operations
 }
 
 export interface ONGResponse {
@@ -211,6 +220,9 @@ export interface InstitutiePublicaRequest {
   reprezentant: ReprezentantRequest;
   nivel_administrativ: NivelAdministrativ;
   buget_anual: number;
+  // MultiversX wallet integration
+  owner_wallet_address: string; // Personal wallet that created this entity
+  entity_wallet_address?: string; // Optional separate wallet for entity operations
 }
 
 export interface InstitutiePublicaResponse {
@@ -237,6 +249,9 @@ export interface EntitateStrainaRequest {
   reprezentant: ReprezentantRequest;
   data_inregistrare_romania: string;
   sucursala_in_romania: boolean;
+  // MultiversX wallet integration
+  owner_wallet_address: string; // Personal wallet that created this entity
+  entity_wallet_address?: string; // Optional separate wallet for entity operations
 }
 
 export interface EntitateStrainaResponse {

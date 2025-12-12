@@ -1,8 +1,48 @@
 <div class="flex min-h-screen">
-  <app-sidebar [items]="navItems" title="TaxChain" subtitle="Taxpayer Portal"></app-sidebar>
-  
+  <app-sidebar
+    [items]="navItems"
+    title="TaxChain"
+    subtitle="Taxpayer Portal"
+  ></app-sidebar>
+
   <main class="flex-1 md:ml-64 p-4 md:p-8 bg-background">
     <div class="max-w-7xl mx-auto">
+      <!-- Wallet Info Bar -->
+      <div
+        *ngIf="walletAddress"
+        class="mb-6 bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between"
+      >
+        <div class="flex items-center space-x-3">
+          <div class="bg-green-100 p-2 rounded-lg">
+            <svg
+              class="w-5 h-5 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Portofel Conectat</p>
+            <p class="text-sm font-medium text-gray-900 font-mono">
+              {{ walletAddress }}
+            </p>
+          </div>
+        </div>
+        <button
+          (click)="logout()"
+          class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+        >
+          Deconectare
+        </button>
+      </div>
+
       <router-outlet></router-outlet>
     </div>
   </main>

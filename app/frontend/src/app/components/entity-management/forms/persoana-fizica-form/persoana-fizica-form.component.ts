@@ -9,6 +9,7 @@ import {
 import { ButtonComponent } from '../../../../shared/ui/button/button.component';
 import { CollapsibleComponent } from '../../../../shared/ui/collapsible/collapsible.component';
 import { EntityManagementService } from '../../../../features/entity_management/services/entity-management.service';
+import { MultiversxAuthService } from '../../../../core/services/multiversx-auth.service';
 import {
   TipPersoanaFizica,
   TipActIdentitate,
@@ -46,6 +47,7 @@ export class PersoanaFizicaFormComponent implements OnInit {
 
   private fb = inject(FormBuilder);
   private entityService = inject(EntityManagementService);
+  private authService = inject(MultiversxAuthService);
 
   ngOnInit(): void {
     this.initForm();
@@ -126,8 +128,19 @@ export class PersoanaFizicaFormComponent implements OnInit {
       return;
     }
 
+    // Get wallet address from auth service
+    const walletAddress = this.authService.getAddress();
+    if (!walletAddress) {
+      console.error('No wallet address found. User must be authenticated.');
+      return;
+    }
+
     this.isLoading = true;
-    const formData: PersoanaFizicaRequest = this.entityForm.value;
+    const formData: PersoanaFizicaRequest = {
+      ...this.entityForm.value,
+      owner_wallet_address: walletAddress, // Add wallet address from authenticated user
+      entity_wallet_address: undefined, // Optional: can be added later if entity needs separate wallet
+    };
 
     this.entityService.createPersoanaFizica(formData).subscribe({
       next: () => {

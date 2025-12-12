@@ -1,15 +1,47 @@
-import { Component } from '@angular/core';
-import { RouterModule } from '@angular/router';
-import { SidebarComponent, NavItem } from '../../shared/components/sidebar/sidebar.component';
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router, RouterModule } from '@angular/router';
+import {
+  SidebarComponent,
+  NavItem,
+} from '../../shared/components/sidebar/sidebar.component';
+import { MultiversxAuthService } from '../../core/services/multiversx-auth.service';
 
 @Component({
   selector: 'app-portal-layout',
   standalone: true,
-  imports: [RouterModule, SidebarComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent],
   templateUrl: './portal-layout.component.html',
   styleUrls: ['./portal-layout.component.css'],
 })
-export class PortalLayoutComponent {
+export class PortalLayoutComponent implements OnInit {
+  walletAddress: string | null = null;
+
+  constructor(
+    private authService: MultiversxAuthService,
+    private router: Router
+  ) {}
+
+  ngOnInit(): void {
+    // Subscribe to auth state changes
+    this.authService.getAuthState().subscribe((state) => {
+      if (state.isAuthenticated && state.address) {
+        // Format address to show first 10 and last 6 characters
+        const addr = state.address;
+        this.walletAddress = `${addr.substring(0, 10)}...${addr.substring(
+          addr.length - 6
+        )}`;
+      } else {
+        this.walletAddress = null;
+      }
+    });
+  }
+
+  async logout(): Promise<void> {
+    await this.authService.logout();
+    this.router.navigate(['/login']);
+  }
+
   navItems: NavItem[] = [
     {
       title: 'Dashboard',
