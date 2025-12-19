@@ -12,7 +12,7 @@ use actix_cors::Cors;
 use actix_web::{App, HttpResponse, HttpServer, web};
 use std::env;
 use utoipa::OpenApi;
-use utoipa_scalar::{Scalar, Servable}; // ← needed for .with_url()
+use utoipa_scalar::{Scalar, Servable};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -40,6 +40,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let cors = Cors::default()
+            .allowed_origin("https://localhost:4200")
             .allowed_origin("http://localhost:4200")
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec![

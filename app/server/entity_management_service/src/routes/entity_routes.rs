@@ -7,10 +7,6 @@ use crate::{
 
 pub fn entity_routes() -> Scope {
     web::scope("/entities")
-        .service(search_entities)  // Public - no auth required
-        .service(
-            web::scope("")
-                .wrap(WalletAuth)  // Protected - auth required
-                .service(get_my_entities)
-        )
+        .service(search_entities)
+        .service(web::scope("").wrap(WalletAuth).service(get_my_entities))
 }
