@@ -5,6 +5,8 @@ use actix_web::{App, HttpResponse, HttpServer, Responder, get};
 // [] Persoana Juridica
 // TODO: Implement Data Structures for PersoanaFizica, PersoanaJuridica, PersoanaFizicaResponse and PersoanaJuridicaResponse to properlly match database schemas
 
+pub mod models;
+
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello World")
