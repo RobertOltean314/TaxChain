@@ -1,0 +1,140 @@
+-- -- Clear existing dummy data before inserting new entries
+-- TRUNCATE TABLE persoana_fizica CASCADE;
+
+-- -- Insert 100 dummy physical persons with new fields
+-- INSERT INTO persoana_fizica (
+--     cnp,
+--     nume,
+--     prenume,
+--     prenume_tata,
+--     data_nasterii,
+--     sex,
+--     adresa_domiciliu,
+--     cod_postal,
+--     iban,
+--     telefon,
+--     email,
+--     stare,
+--     wallet
+-- )
+-- SELECT
+--     (trunc(random() * 9 + 1)::int || lpad((trunc(random()*100000000000)::bigint)::text, 12, '0')) AS cnp,
+--     (ARRAY['Popescu','Ionescu','Dumitrescu','Georgescu','Radu','Stan','Marin','Preda','Vasilescu','Stoica']::text[])[trunc(random() * 10 + 1)::int] AS nume,
+--     (ARRAY['Ion','Maria','Andrei','Elena','Mihai','Ioana','Alex','Ana','Gabriel','Cristina']::text[])[trunc(random() * 10 + 1)::int] AS prenume,
+--     (ARRAY['Gheorghe','Alexandru','Vasile','Ion','Mihai','Florin','Constantin','Petre','Marian','Nicolae']::text[])[trunc(random() * 10 + 1)::int] AS prenume_tata,
+--     DATE '1960-01-01' + (trunc(random() * 23000)::int) AS data_nasterii,  -- Random date between 1960 and ~2023
+--     (ARRAY['M','F']::char[])[trunc(random() * 2 + 1)::int] AS sex,
+--     'Str. ' || (ARRAY['Libertatii','Eminescu','Revolutiei','Stefan cel Mare','Unirii','Bucuresti','Mihai Viteazul','George Cosbuc','Pastravului','Vasile Alecsandri']::text[])[trunc(random() * 10 + 1)::int] || 
+--     ' Nr. ' || (trunc(random()*100 + 1)::int) || ', ' ||
+--     (ARRAY['Bucuresti','Cluj-Napoca','Timisoara','Iasi','Brasov','Constanta','Craiova','Sibiu','Oradea','Ploiesti']::text[])[trunc(random() * 10 + 1)::int] AS adresa_domiciliu,
+--     lpad((trunc(random()*900000 + 100000)::int)::text, 6, '0') AS cod_postal,
+--     'RO' || lpad((trunc(random()*90 + 10)::int)::text,2,'0') || 
+--     (ARRAY['BTRL','RNCB','INGB','BRDE','CARP','EXIMRO','OTPV','BREL','PIRB','UGBI']::text[])[trunc(random()*10+1)::int] || 
+--     lpad((trunc(random()*10000000000000000)::bigint)::text,16,'0') AS iban,
+--     '07' || lpad((trunc(random()*100000000)::int)::text,8,'0') AS telefon,
+--     LOWER(
+--         (ARRAY['Ion','Maria','Andrei','Elena','Mihai','Ioana','Alex','Ana','Gabriel','Cristina']::text[])[trunc(random() * 10 + 1)::int] || '.' ||
+--         (ARRAY['Popescu','Ionescu','Dumitrescu','Georgescu','Radu','Stan','Marin','Preda','Vasilescu','Stoica']::text[])[trunc(random() * 10 + 1)::int] || '@example.com'
+--     ) AS email,
+--     (ARRAY['Activ','Activ','Activ','Activ','Activ','Activ','Activ','Inactiv','Suspendat']::text[])[trunc(random() * 9 + 1)::int] AS stare,  -- 77% Activ
+--     '0x' || substr(md5(random()::text || random()::text), 1, 40) AS wallet
+-- FROM generate_series(1,100);
+
+-- -- Clear existing dummy data for companies
+-- TRUNCATE TABLE persoana_juridica CASCADE;
+
+-- -- Insert 100 dummy companies with new fields
+-- WITH inserted_companies AS (
+--     INSERT INTO persoana_juridica (
+--         cod_fiscal,
+--         denumire,
+--         numar_de_inregistrare_in_registrul_comertului,
+--         an_infiintare,
+--         adresa_sediu_social,
+--         cod_postal,
+--         adresa_puncte_de_lucru,
+--         iban,
+--         telefon,
+--         email,
+--         cod_caen_principal,
+--         coduri_caen_secundare,
+--         numar_angajati,
+--         capital_social,
+--         stare,
+--         wallet
+--     )
+--     SELECT
+--         'RO' || lpad((trunc(random()*90000000 + 10000000)::bigint)::text, 8, '0') AS cod_fiscal,
+--         (ARRAY['Tech','Digital','Smart','Pro','Global','Euro','Mega','Ultra','Prime','Elite']::text[])[trunc(random() * 10 + 1)::int] || ' ' ||
+--         (ARRAY['Solutions','Systems','Services','Consulting','Industries','Trading','Group','Corporation','Company','Enterprises']::text[])[trunc(random() * 10 + 1)::int] || ' SRL' AS denumire,
+--         'J' || lpad((trunc(random()*40 + 1)::int)::text, 2, '0') || '/' ||
+--         lpad((trunc(random()*9000 + 1000)::int)::text, 4, '0') || '/' ||
+--         (2015 + trunc(random()*11)::int)::text AS numar_de_inregistrare_in_registrul_comertului,
+--         (1990 + trunc(random()*36)::int) AS an_infiintare,  -- Founded between 1990 and 2025
+--         'Str. ' || (ARRAY['Aviatorilor','Calea Victoriei','Bulevardul Unirii','Magheru','Dorobanti','Ion Mihalache','Pipera','Floreasca','Decebal','Grivitei']::text[])[trunc(random() * 10 + 1)::int] || 
+--         ' Nr. ' || (trunc(random()*200 + 1)::int) || ', ' ||
+--         (ARRAY['Bucuresti','Cluj-Napoca','Timisoara','Iasi','Brasov','Constanta','Craiova','Sibiu','Oradea','Ploiesti']::text[])[trunc(random() * 10 + 1)::int] AS adresa_sediu_social,
+--         lpad((trunc(random()*900000 + 100000)::int)::text, 6, '0') AS cod_postal,
+--         CASE 
+--             WHEN random() < 0.3 THEN ARRAY[
+--                 'Str. ' || (ARRAY['Libertatii','Eminescu','Revolutiei']::text[])[trunc(random() * 3 + 1)::int] || ' Nr. ' || (trunc(random()*100 + 1)::int) || ', Cluj-Napoca'
+--             ]
+--             ELSE NULL
+--         END AS adresa_puncte_de_lucru,
+--         'RO' || lpad((trunc(random()*90 + 10)::int)::text,2,'0') || 
+--         (ARRAY['BTRL','RNCB','INGB','BRDE','CARP','EXIMRO','OTPV','BREL','PIRB','UGBI']::text[])[trunc(random()*10+1)::int] || 
+--         lpad((trunc(random()*10000000000000000)::bigint)::text,16,'0') AS iban,
+--         '02' || lpad((trunc(random()*10000000)::int)::text,8,'0') AS telefon,
+--         LOWER(
+--             (ARRAY['office','contact','info','sales','support']::text[])[trunc(random() * 5 + 1)::int] || '@' ||
+--             (ARRAY['techsolutions','digitalsystems','smartservices','proconsulting','globaltrading']::text[])[trunc(random() * 5 + 1)::int] || '.ro'
+--         ) AS email,
+--         (ARRAY['6201','6202','6209','4619','4690','7022','7112','7311','6312','6820']::text[])[trunc(random() * 10 + 1)::int] AS cod_caen_principal,
+--         CASE 
+--             WHEN random() < 0.5 THEN ARRAY[
+--                 (ARRAY['6201','6202','7022','7112']::text[])[trunc(random() * 4 + 1)::int],
+--                 (ARRAY['7311','6312','4690','6820']::text[])[trunc(random() * 4 + 1)::int]
+--             ]
+--             ELSE NULL
+--         END AS coduri_caen_secundare,
+--         (trunc(random() * 200 + 1)::int) AS numar_angajati,  -- 1-200 employees
+--         (trunc(random() * 950000 + 50000)::numeric) AS capital_social,
+--         (ARRAY['Activa','Activa','Activa','Activa','Activa','Activa','Radiata','Suspendata','In insolventa']::text[])[trunc(random() * 9 + 1)::int] AS stare,  -- 66% Activa
+--         '0x' || substr(md5(random()::text || random()::text), 1, 40) AS wallet
+--     FROM generate_series(1, 100)
+--     RETURNING id, cod_fiscal
+-- ),
+-- -- Get random persoana_fizica IDs to use as representatives
+-- available_people AS (
+--     SELECT id, row_number() OVER () as rn
+--     FROM persoana_fizica
+--     ORDER BY random()
+--     LIMIT 300
+-- )
+-- -- Insert representatives for each company (1-5 representatives per company)
+-- INSERT INTO reprezentanti_persoana_juridica (
+--     persoana_juridica_id,
+--     persoana_fizica_id,
+--     functie,
+--     data_numire,
+--     data_incetare
+-- )
+-- SELECT
+--     c.id,
+--     p.id,
+--     (ARRAY['Administrator','Director General','Director Executiv','Presedinte','Vicepresedinte','Asociat','Actionar','Manager']::functie_reprezentant[])[trunc(random() * 8 + 1)::int],
+--     CURRENT_DATE - (trunc(random() * 1825)::int) AS data_numire,  -- Random date within last 5 years
+--     CASE 
+--         WHEN random() < 0.15 THEN CURRENT_DATE - (trunc(random() * 365)::int)  -- 15% have terminated
+--         ELSE NULL 
+--     END AS data_incetare
+-- FROM inserted_companies c
+-- CROSS JOIN LATERAL (
+--     SELECT id 
+--     FROM available_people 
+--     WHERE rn BETWEEN ((SELECT row_number() OVER () FROM inserted_companies ic WHERE ic.id = c.id) - 1) * 3 + 1 
+--                  AND ((SELECT row_number() OVER () FROM inserted_companies ic WHERE ic.id = c.id) - 1) * 3 + (trunc(random() * 4 + 1)::int)
+--     LIMIT trunc(random() * 5 + 1)::int  -- Each company gets 1-5 representatives
+-- ) p
+-- ON CONFLICT (persoana_juridica_id, persoana_fizica_id, functie) DO NOTHING;
+
