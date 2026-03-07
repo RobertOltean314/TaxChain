@@ -4,9 +4,6 @@ use validator::ValidationError;
 
 lazy_static! {
     static ref CNP_REGEX: Regex = Regex::new(r"^\d{13}$").unwrap();
-    static ref COD_POSTAL_REGEX: Regex = Regex::new(r"^\d{6}$").unwrap();
-    static ref IBAN_REGEX: Regex = Regex::new(r"^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$").unwrap();
-    static ref TELEFON_REGEX: Regex = Regex::new(r"^\+?[1-9]\d{7,14}$").unwrap();
 }
 
 /// Validates Romanian CNP (Cod Numeric Personal) with checksum verification.
@@ -51,52 +48,19 @@ pub fn validate_cnp(cnp: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-/// Validates Romanian postal code (6 digits).
-pub fn validate_cod_postal(cod: &str) -> Result<(), ValidationError> {
-    if !COD_POSTAL_REGEX.is_match(cod) {
-        return Err(ValidationError::new("cod_postal_invalid"));
-    }
-    Ok(())
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Validates IBAN format with basic structure check.
-/// Full mod-97 validation included.
-pub fn validate_iban(iban: &str) -> Result<(), ValidationError> {
-    if !IBAN_REGEX.is_match(iban) {
-        return Err(ValidationError::new("iban_invalid_format"));
+    #[test]
+    fn test_invalid_cnp_format() {
+        assert!(validate_cnp("123").is_err());
+        assert!(validate_cnp("123456789012a").is_err());
     }
 
-    // IBAN mod-97 checksum validation
-    let rearranged = format!("{}{}", &iban[4..], &iban[..4]);
-
-    let numeric_string: String = rearranged
-        .chars()
-        .map(|c| {
-            if c.is_ascii_uppercase() {
-                format!("{}", c as u32 - 'A' as u32 + 10)
-            } else {
-                c.to_string()
-            }
-        })
-        .collect();
-
-    // Calculate mod 97 in chunks to avoid overflow
-    let remainder = numeric_string.chars().fold(0u64, |acc, c| {
-        let digit = c.to_digit(10).unwrap() as u64;
-        (acc * 10 + digit) % 97
-    });
-
-    if remainder != 1 {
-        return Err(ValidationError::new("iban_invalid_checksum"));
+    #[test]
+    fn test_invalid_cnp_sex_digit() {
+        assert!(validate_cnp("0234567890123").is_err());
+        assert!(validate_cnp("9234567890123").is_err());
     }
-
-    Ok(())
-}
-
-/// Validates phone number in E.164-like format.
-pub fn validate_telefon(telefon: &str) -> Result<(), ValidationError> {
-    if !TELEFON_REGEX.is_match(telefon) {
-        return Err(ValidationError::new("telefon_invalid"));
-    }
-    Ok(())
 }
