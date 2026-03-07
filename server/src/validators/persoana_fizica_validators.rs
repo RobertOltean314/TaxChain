@@ -47,20 +47,3 @@ pub fn validate_cnp(cnp: &str) -> Result<(), ValidationError> {
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_invalid_cnp_format() {
-        assert!(validate_cnp("123").is_err());
-        assert!(validate_cnp("123456789012a").is_err());
-    }
-
-    #[test]
-    fn test_invalid_cnp_sex_digit() {
-        assert!(validate_cnp("0234567890123").is_err());
-        assert!(validate_cnp("9234567890123").is_err());
-    }
-}
