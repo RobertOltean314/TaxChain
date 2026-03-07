@@ -57,7 +57,7 @@ struct PersoanaFizicaRow {
     telefon: Option<String>,
     email: Option<String>,
     stare: String,
-    wallet: Option<String>,
+    wallet: String,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -92,7 +92,7 @@ fn row_to_model(row: PersoanaFizicaRow) -> Result<PersoanaFizica, sqlx::Error> {
         telefon: row.telefon,
         email: row.email,
         stare,
-        wallet: row.wallet,
+        wallet: Some(row.wallet),
         created_at: row.created_at,
         updated_at: row.updated_at,
     })

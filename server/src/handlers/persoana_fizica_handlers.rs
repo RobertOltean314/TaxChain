@@ -46,12 +46,12 @@ pub struct PersoanaFizicaRequest {
     pub stare: Option<StarePersoanaFizica>,
 
     #[validate(length(max = 100, message = "Wallet must be max 100 characters"))]
-    pub wallet: Option<String>,
+    pub wallet: String,
 }
 
 /// GET /persoana-fizica — returns all records.
 #[get("")]
-pub async fn persoana_fizica_handler(
+pub async fn find_all_persoana_fizica(
     repo: web::Data<DynPersoanaFizicaRepository>,
 ) -> impl Responder {
     match repo.find_all().await {
@@ -72,9 +72,7 @@ pub async fn get_persoana_fizica_by_id(
     let id = path.into_inner();
     match repo.find_by_id(id).await {
         Ok(Some(p)) => HttpResponse::Ok().json(p),
-        Ok(None) => {
-            HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found"))
-        }
+        Ok(None) => HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found")),
         Err(e) => {
             eprintln!("find_by_id error: {e}");
             HttpResponse::InternalServerError().finish()
@@ -106,7 +104,7 @@ pub async fn create_persoana_fizica(
         telefon: body.telefon.clone(),
         email: body.email.clone(),
         stare: body.stare.unwrap_or_default(),
-        wallet: body.wallet.clone(),
+        wallet: Some(body.wallet.clone()),
         created_at: now,
         updated_at: now,
     };
@@ -133,8 +131,7 @@ pub async fn update_persoana_fizica(
     let existing = match repo.find_by_id(id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return HttpResponse::NotFound()
-                .body(format!("PersoanaFizica with id {id} not found"));
+            return HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found"));
         }
         Err(e) => {
             eprintln!("update find_by_id error: {e}");
@@ -155,15 +152,13 @@ pub async fn update_persoana_fizica(
         telefon: body.telefon.clone(),
         email: body.email.clone(),
         stare: body.stare.unwrap_or(existing.stare),
-        wallet: body.wallet.clone(),
+        wallet: Some(body.wallet.clone()),
         created_at: existing.created_at,
         updated_at: Utc::now(),
     };
     match repo.update(id, persoana).await {
         Ok(Some(p)) => HttpResponse::Ok().json(p),
-        Ok(None) => {
-            HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found"))
-        }
+        Ok(None) => HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found")),
         Err(e) => {
             eprintln!("update error: {e}");
             HttpResponse::InternalServerError().finish()
@@ -189,5 +184,3 @@ pub async fn delete_persoana_fizica(
         }
     }
 }
-
-

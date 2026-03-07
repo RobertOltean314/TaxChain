@@ -4,8 +4,8 @@ use validator::ValidationError;
 
 lazy_static! {
     static ref COD_POSTAL_REGEX: Regex = Regex::new(r"^\d{6}$").unwrap();
-    static ref IBAN_REGEX: Regex = Regex::new(r"^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$").unwrap();
-    static ref TELEFON_REGEX: Regex = Regex::new(r"^\+?[1-9]\d{7,14}$").unwrap();
+    static ref IBAN_REGEX: Regex = Regex::new(r"^RO\d{2}[A-Z]{4}[A-Z0-9]{16}$").unwrap();
+    static ref TELEFON_REGEX: Regex = Regex::new(r"^(?:\+40|0)7\d{8}$").unwrap();
 }
 
 /// Validates Romanian postal code (6 digits).
