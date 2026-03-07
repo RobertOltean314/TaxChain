@@ -1,5 +1,8 @@
-use actix_web::{HttpResponse, Responder};
+// use actix_web::{HttpResponse, get};
 
-pub fn find_all() -> impl Responder {
-    HttpResponse::Ok().body("Works fine!")
-}
+// use crate::models::PersoanaFizica;
+
+// #[get("/find-all")]
+// pub async fn find_all() {
+//     HttpResponse::Ok().body("Works fine! - Find All Persoana Fizica")
+// }
