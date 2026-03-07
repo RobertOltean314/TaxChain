@@ -10,6 +10,8 @@ use taxchain::{
     services::persoana_fizica_service::{DynPersoanaFizicaRepository, PgPersoanaFizicaRepository},
 };
 
+//TODO: Implement proper HTTP Status Codes with body message when something unexpected happens. Each case should return the proper Status Code suggested by the HTTP Standard, for example, if a page doesn't exist we should return 404 Status code, if an endpoi has query parameters but they were not provided we should return 422 and so on
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
