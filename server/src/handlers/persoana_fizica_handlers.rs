@@ -1,54 +1,10 @@
 use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
-use chrono::{NaiveDate, Utc};
-use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::models::{PersoanaFizica, Sex, StarePersoanaFizica};
+use crate::models::{PersoanaFizica, PersoanaFizicaRequest};
 use crate::services::persoana_fizica_service::DynPersoanaFizicaRepository;
-use crate::validators::{validate_cnp, validate_cod_postal, validate_iban, validate_telefon};
-
-/// Request body used for both create and update operations.
-#[derive(Debug, Deserialize, Validate)]
-pub struct PersoanaFizicaRequest {
-    #[validate(custom(function = "validate_cnp"))]
-    pub cnp: String,
-
-    #[validate(length(min = 1, max = 50, message = "Nume must be 1-50 characters"))]
-    pub nume: String,
-
-    #[validate(length(min = 1, max = 50, message = "Prenume must be 1-50 characters"))]
-    pub prenume: String,
-
-    #[validate(length(max = 30, message = "Prenume tata must be max 30 characters"))]
-    pub prenume_tata: Option<String>,
-
-    pub data_nasterii: NaiveDate,
-
-    pub sex: Sex,
-
-    #[validate(length(min = 1, max = 200, message = "Adresa must be 1-200 characters"))]
-    pub adresa_domiciliu: String,
-
-    #[validate(custom(function = "validate_cod_postal"))]
-    pub cod_postal: Option<String>,
-
-    #[validate(custom(function = "validate_iban"))]
-    pub iban: String,
-
-    #[validate(custom(function = "validate_telefon"))]
-    pub telefon: Option<String>,
-
-    #[validate(email(message = "Invalid email format"))]
-    #[validate(length(max = 100, message = "Email must be max 100 characters"))]
-    pub email: Option<String>,
-
-    pub stare: Option<StarePersoanaFizica>,
-
-    #[validate(length(max = 100, message = "Wallet must be max 100 characters"))]
-    pub wallet: String,
-}
 
 /// GET /persoana-fizica — returns all records.
 #[get("")]
@@ -96,25 +52,9 @@ pub async fn create_persoana_fizica(
     if let Err(errors) = body.validate() {
         return HttpResponse::BadRequest().body(errors.to_string());
     }
-    let now = Utc::now();
-    let persoana = PersoanaFizica {
-        id: Uuid::new_v4(),
-        cnp: body.cnp.clone(),
-        nume: body.nume.clone(),
-        prenume: body.prenume.clone(),
-        prenume_tata: body.prenume_tata.clone(),
-        data_nasterii: body.data_nasterii,
-        sex: body.sex,
-        adresa_domiciliu: body.adresa_domiciliu.clone(),
-        cod_postal: body.cod_postal.clone(),
-        iban: body.iban.clone(),
-        telefon: body.telefon.clone(),
-        email: body.email.clone(),
-        stare: body.stare.unwrap_or_default(),
-        wallet: Some(body.wallet.clone()),
-        created_at: now,
-        updated_at: now,
-    };
+
+    let persoana = PersoanaFizica::from_request(body.into_inner());
+
     match repo.create(persoana).await {
         Ok(created) => HttpResponse::Created().json(created),
         Err(e) => {
@@ -137,6 +77,7 @@ pub async fn update_persoana_fizica(
     }
     let id = path.into_inner();
     let not_found_error = json!({"error": format!("PersoanaFizica with id {id} not found")});
+
     let existing = match repo.find_by_id(id).await {
         Ok(Some(p)) => p,
         Ok(None) => return HttpResponse::NotFound().json(not_found_error),
@@ -149,24 +90,9 @@ pub async fn update_persoana_fizica(
             return HttpResponse::InternalServerError().json(error_body);
         }
     };
-    let persoana = PersoanaFizica {
-        id,
-        cnp: body.cnp.clone(),
-        nume: body.nume.clone(),
-        prenume: body.prenume.clone(),
-        prenume_tata: body.prenume_tata.clone(),
-        data_nasterii: body.data_nasterii,
-        sex: body.sex,
-        adresa_domiciliu: body.adresa_domiciliu.clone(),
-        cod_postal: body.cod_postal.clone(),
-        iban: body.iban.clone(),
-        telefon: body.telefon.clone(),
-        email: body.email.clone(),
-        stare: body.stare.unwrap_or(existing.stare),
-        wallet: Some(body.wallet.clone()),
-        created_at: existing.created_at,
-        updated_at: Utc::now(),
-    };
+
+    let persoana = PersoanaFizica::update_from_request(&existing, &body);
+
     match repo.update(id, persoana).await {
         Ok(Some(p)) => HttpResponse::Ok().json(p),
         Ok(None) => HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found")),
@@ -186,7 +112,7 @@ pub async fn delete_persoana_fizica(
 ) -> impl Responder {
     let id = path.into_inner();
     let success_body =
-        json!({"success": format!("The entity with id {} was succesfully deleted", id)});
+        json!({"success": format!("The entity with id {} was successfully deleted", id)});
     let not_found_error_body =
         json!({"error": format!("There is no entity with the id {} inside our database.", id)});
 
