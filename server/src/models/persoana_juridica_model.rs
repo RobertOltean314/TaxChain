@@ -12,7 +12,7 @@ use crate::validators::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[sqlx(type_name = "stare_persoana_juridica", rename_all = "lowercase")]
+#[sqlx(type_name = "stare_persoana_juridica")]
 pub enum StarePersoanaJuridica {
     Activa,
     Suspendata,
@@ -85,6 +85,7 @@ pub struct PersoanaJuridica {
 /// Request body used for both create and update operations.
 #[derive(Debug, Deserialize, Validate)]
 pub struct PersoanaJuridicaRequest {
+    // TODO: Implement validation for those fields
     pub cod_fiscal: String,
     pub denumire: String,
     pub numar_de_inregistrare_in_registrul_comertului: String,
@@ -146,7 +147,7 @@ impl PersoanaJuridica {
         }
     }
 
-    pub fn fron_request(req: PersoanaJuridicaRequest) -> Self {
+    pub fn from_request(req: PersoanaJuridicaRequest) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
