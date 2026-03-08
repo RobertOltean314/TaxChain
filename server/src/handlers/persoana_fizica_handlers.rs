@@ -1,6 +1,7 @@
 use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 use chrono::{NaiveDate, Utc};
 use serde::Deserialize;
+use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -58,7 +59,8 @@ pub async fn find_all_persoana_fizica(
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
             eprintln!("find_all error: {e}");
-            HttpResponse::InternalServerError().finish()
+            let error_body = json!({"error": "Failed to retrieve all Persoana Fizica entities", "details": e.to_string()});
+            HttpResponse::InternalServerError().json(error_body)
         }
     }
 }
@@ -70,12 +72,17 @@ pub async fn get_persoana_fizica_by_id(
     path: web::Path<Uuid>,
 ) -> impl Responder {
     let id = path.into_inner();
+    let not_found_error = json!({"error": format!("Persoana Fizica with id {} was not found", id)});
     match repo.find_by_id(id).await {
         Ok(Some(p)) => HttpResponse::Ok().json(p),
-        Ok(None) => HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found")),
+        Ok(None) => HttpResponse::NotFound().json(not_found_error),
         Err(e) => {
             eprintln!("find_by_id error: {e}");
-            HttpResponse::InternalServerError().finish()
+            let error_body = json!({
+                "error": format!("We couldn't retrieve Persoana Fizica with id: {}, it doesn't exist in our database", id),
+                "details": e.to_string()
+            });
+            HttpResponse::InternalServerError().json(error_body)
         }
     }
 }
@@ -112,7 +119,8 @@ pub async fn create_persoana_fizica(
         Ok(created) => HttpResponse::Created().json(created),
         Err(e) => {
             eprintln!("create error: {e}");
-            HttpResponse::InternalServerError().finish()
+            let error_body = json!({"error": "We failed to create the Persoana Fizica Entity. Please review the details", "details": e.to_string()});
+            HttpResponse::InternalServerError().json(error_body)
         }
     }
 }
@@ -128,14 +136,17 @@ pub async fn update_persoana_fizica(
         return HttpResponse::BadRequest().body(errors.to_string());
     }
     let id = path.into_inner();
+    let not_found_error = json!({"error": format!("PersoanaFizica with id {id} not found")});
     let existing = match repo.find_by_id(id).await {
         Ok(Some(p)) => p,
-        Ok(None) => {
-            return HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found"));
-        }
+        Ok(None) => return HttpResponse::NotFound().json(not_found_error),
         Err(e) => {
             eprintln!("update find_by_id error: {e}");
-            return HttpResponse::InternalServerError().finish();
+            let error_body = json!({
+                "error": format!("We couldn't retrieve Persoana Fizica with id: {}, it doesn't exist in our database", id),
+                "details": e.to_string()
+            });
+            return HttpResponse::InternalServerError().json(error_body);
         }
     };
     let persoana = PersoanaFizica {
@@ -161,7 +172,8 @@ pub async fn update_persoana_fizica(
         Ok(None) => HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found")),
         Err(e) => {
             eprintln!("update error: {e}");
-            HttpResponse::InternalServerError().finish()
+            let error_body = json!({"error": format!("We failed to update the Persoana Fizica entity with id {}, please review the details for more information", id), "details": e.to_string()});
+            HttpResponse::InternalServerError().json(error_body)
         }
     }
 }
@@ -173,14 +185,18 @@ pub async fn delete_persoana_fizica(
     path: web::Path<Uuid>,
 ) -> impl Responder {
     let id = path.into_inner();
+    let success_body =
+        json!({"success": format!("The entity with id {} was succesfully deleted", id)});
+    let not_found_error_body =
+        json!({"error": format!("There is no entity with the id {} inside our database.", id)});
+
     match repo.delete(id).await {
-        Ok(true) => HttpResponse::NoContent().finish(),
-        Ok(false) => {
-            HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found"))
-        }
+        Ok(true) => HttpResponse::NoContent().json(success_body),
+        Ok(false) => HttpResponse::NotFound().json(not_found_error_body),
         Err(e) => {
             eprintln!("delete error: {e}");
-            HttpResponse::InternalServerError().finish()
+            let error_body = json!({"error": format!("We failed delete the entity with id {}, please check the details for more information", id), "details": e.to_string()});
+            HttpResponse::InternalServerError().json(error_body)
         }
     }
 }
