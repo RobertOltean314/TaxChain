@@ -92,7 +92,7 @@ fn row_to_model(row: PersoanaFizicaRow) -> Result<PersoanaFizica, sqlx::Error> {
         telefon: row.telefon,
         email: row.email,
         stare,
-        wallet: Some(row.wallet),
+        wallet: row.wallet,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
