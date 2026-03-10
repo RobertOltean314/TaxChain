@@ -75,7 +75,7 @@ pub struct PersoanaFizica {
 }
 
 /// Request body used for both create and update operations.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Serialize, Validate)]
 pub struct PersoanaFizicaRequest {
     #[validate(custom(function = "validate_cnp"))]
     pub cnp: String,

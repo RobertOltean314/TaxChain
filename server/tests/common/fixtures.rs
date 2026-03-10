@@ -1,5 +1,5 @@
 use chrono::{DateTime, NaiveDate};
-use taxchain::models::{PersoanaFizica, Sex, StarePersoanaFizica};
+use taxchain::models::{PersoanaFizica, PersoanaFizicaRequest, Sex, StarePersoanaFizica};
 use uuid::{Uuid, uuid};
 
 pub const POPESCU_ID: Uuid = uuid!("550e8400-e29b-41d4-a716-446655440000");
@@ -63,4 +63,22 @@ pub fn mock_persoana_fizica() -> Vec<PersoanaFizica> {
             updated_at: DateTime::from_timestamp(0, 0).unwrap(),
         },
     ]
+}
+
+pub fn mock_persoana_fizica_request() -> PersoanaFizicaRequest {
+    PersoanaFizicaRequest {
+        cnp: "1960523123457".to_string(),
+        nume: "Popescu".to_string(),
+        prenume: "Ion".to_string(),
+        prenume_tata: Some("Gheorghe".to_string()),
+        data_nasterii: NaiveDate::from_ymd_opt(1996, 5, 23).unwrap(),
+        sex: Sex::M,
+        adresa_domiciliu: "Str. Mihai Viteazu 12, Sibiu".to_string(),
+        cod_postal: Some("550123".to_string()),
+        iban: "RO49AAAA1B31007593840000".to_string(),
+        telefon: Some("+40740111222".to_string()),
+        email: Some("ion.popescu@example.com".to_string()),
+        stare: Some(StarePersoanaFizica::Activ),
+        wallet: "erd1qyu5wthldmockwalletaddress0001".to_string(),
+    }
 }

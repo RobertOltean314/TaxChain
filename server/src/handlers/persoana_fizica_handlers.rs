@@ -50,7 +50,7 @@ pub async fn create_persoana_fizica(
     body: web::Json<PersoanaFizicaRequest>,
 ) -> impl Responder {
     if let Err(errors) = body.validate() {
-        return HttpResponse::BadRequest().body(errors.to_string());
+        return HttpResponse::UnprocessableEntity().body(errors.to_string());
     }
 
     let persoana = PersoanaFizica::from_request(body.into_inner());
