@@ -1,6 +1,28 @@
--- -- ENUMS
+-- -- -- ENUMS
 
+-- DROP TYPE IF EXISTS sex CASCADE;
+-- DROP TYPE IF EXISTS stare_persoana_fizica CASCADE;
+-- DROP TYPE IF EXISTS stare_persoana_juridica CASCADE;
 -- DROP TYPE IF EXISTS functie_reprezentant CASCADE;
+
+-- CREATE TYPE sex AS ENUM (
+--     'M',
+--     'F'
+-- );
+
+-- CREATE TYPE stare_persoana_fizica AS ENUM (
+--     'Activ',
+--     'Inactiv',
+--     'Suspendat'
+-- );
+
+-- CREATE TYPE stare_persoana_juridica AS ENUM (
+--     'Activa',
+--     'Radiata',
+--     'Suspendata',
+--     'In insolventa'
+-- );
+
 -- CREATE TYPE functie_reprezentant AS ENUM (
 --     'Administrator',
 --     'Director General',
@@ -12,7 +34,7 @@
 --     'Manager'
 -- );
 
--- -- TABLES
+-- -- -- TABLES
 
 -- DROP TABLE IF EXISTS reprezentanti_persoana_juridica CASCADE;
 -- DROP TABLE IF EXISTS persoana_juridica CASCADE;
@@ -25,13 +47,13 @@
 --     prenume VARCHAR(50) NOT NULL,
 --     prenume_tata VARCHAR(30),
 --     data_nasterii DATE NOT NULL,
---     sex CHAR(1) NOT NULL CHECK (sex IN ('M', 'F')),
+--     sex sex NOT NULL,
 --     adresa_domiciliu VARCHAR(200) NOT NULL,
 --     cod_postal VARCHAR(6),
 --     iban VARCHAR(34) UNIQUE CHECK (iban ~ '^[A-Z0-9]+$' AND char_length(iban) BETWEEN 15 AND 34),
 --     telefon VARCHAR(15) CHECK (telefon ~ '^[0-9]+$'),
 --     email VARCHAR(100) CHECK (email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
---     stare VARCHAR(20) DEFAULT 'Activ' CHECK (stare IN ('Activ', 'Inactiv', 'Suspendat')),
+--     stare stare_persoana_fizica DEFAULT 'Activ',
 --     wallet VARCHAR(100),
 --     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 --     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -53,7 +75,7 @@
 --     coduri_caen_secundare VARCHAR(10)[], 
 --     numar_angajati INTEGER CHECK (numar_angajati >= 0),
 --     capital_social DECIMAL(15, 2) NOT NULL CHECK (capital_social >= 0),
---     stare VARCHAR(20) DEFAULT 'Activa' CHECK (stare IN ('Activa', 'Radiata', 'Suspendata', 'In insolventa')),
+--     stare stare_persoana_juridica DEFAULT 'Activa',
 --     wallet VARCHAR(100),
 --     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 --     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -70,7 +92,9 @@
 --     UNIQUE(persoana_juridica_id, persoana_fizica_id, functie)
 -- );
 
--- -- QUERIES
+-- -- -- QUERIES
 
 SELECT * FROM persoana_fizica;
-SELECT * FROM persoana_juridica;
+-- SELECT * FROM persoana_juridica;
+-- SELECT * FROM reprezentanti_persoana_juridica
+
