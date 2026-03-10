@@ -12,6 +12,7 @@ pub enum MockBehaviour {
     Success,
     Created,
     NoContent,
+    BadRequest,
     NotFound,
     InternalServerError,
 }
