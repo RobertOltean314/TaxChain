@@ -29,7 +29,7 @@ pub enum Sex {
 
 /// Core domain model for a physical person (individual taxpayer).
 /// This struct represents the database entity.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
 pub struct PersoanaFizica {
     pub id: Uuid,
 
