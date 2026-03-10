@@ -4,7 +4,8 @@ use actix_web::{App, HttpServer, web};
 use taxchain::{
     handlers::{
         create_persoana_fizica, delete_persoana_fizica, find_all_persoana_fizica,
-        get_persoana_fizica_by_id, persoana_juridica_handler, update_persoana_fizica,
+        find_all_persoana_juridica, get_persoana_fizica_by_id,
+        persoana_juridica_handlers::get_persoana_juridica_by_id, update_persoana_fizica,
     },
     hello,
     services::persoana_fizica_service::{DynPersoanaFizicaRepository, PgPersoanaFizicaRepository},
@@ -43,7 +44,11 @@ async fn main() -> std::io::Result<()> {
                     .service(update_persoana_fizica)
                     .service(delete_persoana_fizica),
             )
-            .service(web::scope("/persoana-juridica").service(persoana_juridica_handler))
+            .service(
+                web::scope("/persoana-juridica")
+                    .service(find_all_persoana_juridica)
+                    .service(get_persoana_juridica_by_id),
+            )
     })
     .bind(("127.0.0.1", 8080))?
     .run()

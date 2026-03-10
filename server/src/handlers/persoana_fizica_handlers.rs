@@ -93,9 +93,8 @@ pub async fn update_persoana_fizica(
 
     let persoana = PersoanaFizica::update_from_request(&existing, &body);
 
-    match repo.update(id, persoana).await {
-        Ok(Some(p)) => HttpResponse::Ok().json(p),
-        Ok(None) => HttpResponse::NotFound().body(format!("PersoanaFizica with id {id} not found")),
+    match repo.update(persoana).await {
+        Ok(p) => HttpResponse::Ok().json(p),
         Err(e) => {
             eprintln!("update error: {e}");
             let error_body = json!({"error": format!("We failed to update the Persoana Fizica entity with id {}, please review the details for more information", id), "details": e.to_string()});

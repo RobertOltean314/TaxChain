@@ -1,12 +1,14 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::Type;
 use uuid::Uuid;
 use validator::Validate;
 
 use crate::validators::{validate_cnp, validate_cod_postal, validate_iban, validate_telefon};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[sqlx(type_name = "stare_persoana_fizica")]
+
 pub enum StarePersoanaFizica {
     Activ,
     Inactiv,
@@ -19,7 +21,7 @@ impl Default for StarePersoanaFizica {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum Sex {
     M,
     F,
