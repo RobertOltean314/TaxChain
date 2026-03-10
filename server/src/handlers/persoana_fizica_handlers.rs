@@ -73,7 +73,7 @@ pub async fn update_persoana_fizica(
     body: web::Json<PersoanaFizicaRequest>,
 ) -> impl Responder {
     if let Err(errors) = body.validate() {
-        return HttpResponse::BadRequest().body(errors.to_string());
+        return HttpResponse::UnprocessableEntity().body(errors.to_string());
     }
     let id = path.into_inner();
     let not_found_error = json!({"error": format!("PersoanaFizica with id {id} not found")});
