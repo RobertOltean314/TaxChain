@@ -1,10 +1,8 @@
-use std::path;
-
 use crate::{
     models::{PersoanaJuridica, PersoanaJuridicaRequest},
     services::persoana_juridica_service::DynPersoanaJuridicaRepository,
 };
-use actix_web::{HttpResponse, Responder, body, get, post, put, web};
+use actix_web::{HttpResponse, Responder, get, post, put, web};
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;

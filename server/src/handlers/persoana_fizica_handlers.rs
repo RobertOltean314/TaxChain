@@ -93,7 +93,7 @@ pub async fn update_persoana_fizica(
 
     let persoana = PersoanaFizica::update_from_request(&existing, &body);
 
-    match repo.update(persoana).await {
+    match repo.update(id, persoana).await {
         Ok(p) => HttpResponse::Ok().json(p),
         Err(e) => {
             eprintln!("update error: {e}");
