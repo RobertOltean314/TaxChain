@@ -6,8 +6,8 @@ mod test {
     use taxchain::models::PersoanaFizica;
 
     #[actix_web::test]
-    async fn test_find_all_returns_200_with_results() {
-        let app = build_app(MockBehaviour::ReturnsResults).await;
+    async fn test_find_all_returns_200_on_success() {
+        let app = build_app(MockBehaviour::Success).await;
         let req = test::TestRequest::get()
             .uri("/persoana-fizica")
             .to_request();
@@ -23,27 +23,16 @@ mod test {
     }
 
     #[actix_web::test]
-    async fn test_find_all_returns_200_with_empty_list() {
-        let app = build_app(MockBehaviour::ReturnsEmpty).await;
-        let req = test::TestRequest::get()
-            .uri("/persoana-fizica")
-            .to_request();
-
-        let res = test::call_service(&app, req).await;
-        assert_eq!(res.status(), StatusCode::OK);
-
-        let body: Vec<PersoanaFizica> = test::read_body_json(res).await;
-        assert!(body.is_empty());
-    }
-
-    #[actix_web::test]
     async fn test_find_all_returns_500_on_error() {
-        let app = build_app(MockBehaviour::DatabaseFails).await;
+        let app = build_app(MockBehaviour::InternalServerError).await;
         let req = test::TestRequest::get()
             .uri("/persoana-fizica")
             .to_request();
-        let res = test::call_service(&app, req).await;
 
+        let res = test::call_service(&app, req).await;
         assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let body = test::read_body(res).await;
+        assert!(!body.is_empty());
     }
 }

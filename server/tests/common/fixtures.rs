@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate};
 use taxchain::models::{PersoanaFizica, Sex, StarePersoanaFizica};
 use uuid::{Uuid, uuid};
 
@@ -23,8 +23,8 @@ pub fn mock_persoana_fizica() -> Vec<PersoanaFizica> {
             email: Some("ion.popescu@example.com".to_string()),
             stare: StarePersoanaFizica::Activ,
             wallet: "erd1qyu5wthldmockwalletaddress0001".to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: DateTime::from_timestamp(0, 0).unwrap(),
+            updated_at: DateTime::from_timestamp(0, 0).unwrap(),
         },
         PersoanaFizica {
             id: IONESCU_ID,
@@ -41,8 +41,8 @@ pub fn mock_persoana_fizica() -> Vec<PersoanaFizica> {
             email: Some("maria.ionescu@example.com".to_string()),
             stare: StarePersoanaFizica::Activ,
             wallet: "erd1kz8m8mockwalletaddress0002".to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: DateTime::from_timestamp(0, 0).unwrap(),
+            updated_at: DateTime::from_timestamp(0, 0).unwrap(),
         },
         PersoanaFizica {
             id: GEORGESCU_ID,
@@ -59,8 +59,8 @@ pub fn mock_persoana_fizica() -> Vec<PersoanaFizica> {
             email: Some("andrei.georgescu@example.com".to_string()),
             stare: StarePersoanaFizica::Inactiv,
             wallet: "erd1l9d2mockwalletaddress0003".to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: DateTime::from_timestamp(0, 0).unwrap(),
+            updated_at: DateTime::from_timestamp(0, 0).unwrap(),
         },
     ]
 }
