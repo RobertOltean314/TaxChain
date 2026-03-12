@@ -24,6 +24,27 @@ impl Default for StarePersoanaJuridica {
     }
 }
 
+impl StarePersoanaJuridica {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StarePersoanaJuridica::Activa => "Activa",
+            StarePersoanaJuridica::Radiata => "Radiata",
+            StarePersoanaJuridica::InInsolventa => "In insolventa",
+            StarePersoanaJuridica::Suspendata => "Suspendata",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "Activa" => Ok(StarePersoanaJuridica::Activa),
+            "Radiata" => Ok(StarePersoanaJuridica::Radiata),
+            "In insolventa" => Ok(StarePersoanaJuridica::InInsolventa),
+            "Suspendata" => Ok(StarePersoanaJuridica::Suspendata),
+            other => Err(format!("Unknown stare persoana juridica value: '{other}'")),
+        }
+    }
+}
+
 /// Core domain model for a businesses.
 /// This struct represents the database entity.
 #[derive(Debug, Serialize, Deserialize, Clone, Validate)]

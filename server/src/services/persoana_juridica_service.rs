@@ -8,50 +8,58 @@ use uuid::Uuid;
 use crate::models::{PersoanaJuridica, StarePersoanaJuridica};
 
 const FIND_ALL_PERSOANE_JURIDICE_QUERY: &str =
-    "SELECT id, cod_fiscal, denumire, numar_de_inregistrare_in_registrul_comertului, 
-            an_infiintare, adresa_sediu_social, cod_postal, adresa_puncte_de_lucru, 
-            iban, telefon, email, cod_caen_principal, coduri_caen_secundare, 
-            numar_angajati, capital_social, stare, wallet, created_at, updated_at 
+    "SELECT id, cod_fiscal, denumire, numar_de_inregistrare_in_registrul_comertului,
+            an_infiintare, adresa_sediu_social, cod_postal, adresa_puncte_de_lucru,
+            iban, telefon, email, cod_caen_principal, coduri_caen_secundare,
+            numar_angajati, capital_social::float8 AS capital_social,
+            stare::text AS stare,
+            wallet, created_at, updated_at
      FROM persoana_juridica";
 
 const FIND_PERSOANA_JURIDICA_BY_ID: &str =
-    "SELECT id, cod_fiscal, denumire, numar_de_inregistrare_in_registrul_comertului, 
-            an_infiintare, adresa_sediu_social, cod_postal, adresa_puncte_de_lucru, 
-            iban, telefon, email, cod_caen_principal, coduri_caen_secundare, 
-            numar_angajati, capital_social, stare, wallet, created_at, updated_at 
+    "SELECT id, cod_fiscal, denumire, numar_de_inregistrare_in_registrul_comertului,
+            an_infiintare, adresa_sediu_social, cod_postal, adresa_puncte_de_lucru,
+            iban, telefon, email, cod_caen_principal, coduri_caen_secundare,
+            numar_angajati, capital_social::float8 AS capital_social,
+            stare::text AS stare,
+            wallet, created_at, updated_at
      FROM persoana_juridica WHERE id = $1";
 
-const CREATE_PERSOANA_JURIDICA_QUERY: &str = "INSERT INTO persoana_juridica (
+const CREATE_PERSOANA_JURIDICA_QUERY: &str = "
+    INSERT INTO persoana_juridica (
         id, cod_fiscal, denumire, numar_de_inregistrare_in_registrul_comertului,
         an_infiintare, adresa_sediu_social, cod_postal, adresa_puncte_de_lucru,
         iban, telefon, email, cod_caen_principal, coduri_caen_secundare,
-        numar_angajati, capital_social, stare, wallet
+        numar_angajati, capital_social::float8 AS capital_social, stare, wallet
     ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16, $17
+        $11, $12, $13, $14, $15, $16::stare_persoana_juridica, $17
     )
-    RETURNING *";
+    RETURNING id, cod_fiscal, denumire, numar_de_inregistrare_in_registrul_comertului,
+              an_infiintare, adresa_sediu_social, cod_postal, adresa_puncte_de_lucru,
+              iban, telefon, email, cod_caen_principal, coduri_caen_secundare,
+              numar_angajati, capital_social::float8 AS capital_social,
+              stare::text AS stare,
+              wallet, created_at, updated_at";
 
-const UPDATE_PERSOANA_JURIDICA_QUERY: &str = "UPDATE persoana_juridica SET
-        cod_fiscal = $1,
-        denumire = $2,
+const UPDATE_PERSOANA_JURIDICA_QUERY: &str = "
+    UPDATE persoana_juridica SET
+        cod_fiscal = $1, denumire = $2,
         numar_de_inregistrare_in_registrul_comertului = $3,
-        an_infiintare = $4,
-        adresa_sediu_social = $5,
-        cod_postal = $6,
-        adresa_puncte_de_lucru = $7,
-        iban = $8,
-        telefon = $9,
-        email = $10,
-        cod_caen_principal = $11,
-        coduri_caen_secundare = $12,
-        numar_angajati = $13,
-        capital_social = $14,
-        stare = $15,
-        wallet = $16,
-        updated_at = NOW()
+        an_infiintare = $4, adresa_sediu_social = $5,
+        cod_postal = $6, adresa_puncte_de_lucru = $7,
+        iban = $8, telefon = $9, email = $10,
+        cod_caen_principal = $11, coduri_caen_secundare = $12,
+        numar_angajati = $13, capital_social = $14,
+        stare = $15::stare_persoana_juridica,
+        wallet = $16, updated_at = NOW()
     WHERE id = $17
-    RETURNING *";
+    RETURNING id, cod_fiscal, denumire, numar_de_inregistrare_in_registrul_comertului,
+              an_infiintare, adresa_sediu_social, cod_postal, adresa_puncte_de_lucru,
+              iban, telefon, email, cod_caen_principal, coduri_caen_secundare,
+              numar_angajati, capital_social::float8 AS capital_social,
+              stare::text AS stare,
+              wallet, created_at, updated_at";
 
 const DELETE_PERSOANA_JURIDICA_QUERY: &str = "DELETE FROM persoana_juridica WHERE id = $1";
 
@@ -93,13 +101,19 @@ struct PersoanaJuridicaRow {
     coduri_caen_secundare: Option<Vec<String>>,
     numar_angajati: i32,
     capital_social: f64,
-    stare: StarePersoanaJuridica,
+    stare: String,
     wallet: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 
 fn row_to_model(row: PersoanaJuridicaRow) -> Result<PersoanaJuridica, sqlx::Error> {
+    let stare =
+        StarePersoanaJuridica::from_str(&row.stare).map_err(|e| sqlx::Error::ColumnDecode {
+            index: "stare".to_string(),
+            source: Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+        })?;
+
     Ok(PersoanaJuridica {
         id: row.id,
         cod_fiscal: row.cod_fiscal,
@@ -117,7 +131,7 @@ fn row_to_model(row: PersoanaJuridicaRow) -> Result<PersoanaJuridica, sqlx::Erro
         coduri_caen_secundare: row.coduri_caen_secundare,
         numar_angajati: row.numar_angajati,
         capital_social: row.capital_social,
-        stare: row.stare,
+        stare,
         wallet: row.wallet,
         created_at: row.created_at,
         updated_at: row.updated_at,
