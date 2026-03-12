@@ -7,33 +7,51 @@ use uuid::Uuid;
 
 use crate::models::{PersoanaFizica, Sex, StarePersoanaFizica};
 
-const SELECT_PERSOANA_FIZICA_QUERY: &str = "SELECT id, cnp, nume, prenume, prenume_tata, data_nasterii, sex, \
-             adresa_domiciliu, cod_postal, iban, telefon, email, stare, wallet, \
-             created_at, updated_at \
-             FROM persoana_fizica";
+const SELECT_PERSOANA_FIZICA_QUERY: &str = "
+    SELECT id, cnp, nume, prenume, prenume_tata, data_nasterii,
+           sex::text AS sex,
+           adresa_domiciliu, cod_postal, iban, telefon, email,
+           stare::text AS stare,
+           wallet, created_at, updated_at
+    FROM persoana_fizica
+";
 
-const FIND_PERSOANA_FIZICA_BY_ID_QUERY: &str = "SELECT id, cnp, nume, prenume, prenume_tata, data_nasterii, sex, \
-             adresa_domiciliu, cod_postal, iban, telefon, email, stare, wallet, \
-             created_at, updated_at \
-             FROM persoana_fizica WHERE id = $1";
+const FIND_PERSOANA_FIZICA_BY_ID_QUERY: &str = "
+    SELECT id, cnp, nume, prenume, prenume_tata, data_nasterii,
+           sex::text AS sex,
+           adresa_domiciliu, cod_postal, iban, telefon, email,
+           stare::text AS stare,
+           wallet, created_at, updated_at
+    FROM persoana_fizica WHERE id = $1
+";
 
-const CREATE_PERSOANA_FIZICA_QUERY: &str = "INSERT INTO persoana_fizica \
-             (id, cnp, nume, prenume, prenume_tata, data_nasterii, sex, \
-              adresa_domiciliu, cod_postal, iban, telefon, email, stare, wallet, \
-              created_at, updated_at) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) \
-             RETURNING id, cnp, nume, prenume, prenume_tata, data_nasterii, sex, \
-                       adresa_domiciliu, cod_postal, iban, telefon, email, stare, wallet, \
-                       created_at, updated_at";
+const CREATE_PERSOANA_FIZICA_QUERY: &str = "
+    INSERT INTO persoana_fizica
+        (id, cnp, nume, prenume, prenume_tata, data_nasterii, sex,
+         adresa_domiciliu, cod_postal, iban, telefon, email, stare, wallet,
+         created_at, updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7::sex,$8,$9,$10,$11,$12,$13::stare_persoana_fizica,$14,$15,$16)
+    RETURNING id, cnp, nume, prenume, prenume_tata, data_nasterii,
+              sex::text AS sex,
+              adresa_domiciliu, cod_postal, iban, telefon, email,
+              stare::text AS stare,
+              wallet, created_at, updated_at
+";
 
-const UPDATE_PERSOANA_FIZICA_QUERY: &str = "UPDATE persoana_fizica \
-             SET cnp=$1, nume=$2, prenume=$3, prenume_tata=$4, data_nasterii=$5, sex=$6, \
-                 adresa_domiciliu=$7, cod_postal=$8, iban=$9, telefon=$10, email=$11, \
-                 stare=$12, wallet=$13, updated_at=$14 \
-             WHERE id=$15 \
-             RETURNING id, cnp, nume, prenume, prenume_tata, data_nasterii, sex, \
-                       adresa_domiciliu, cod_postal, iban, telefon, email, stare, wallet, \
-                       created_at, updated_at";
+const UPDATE_PERSOANA_FIZICA_QUERY: &str = "
+    UPDATE persoana_fizica
+    SET cnp=$1, nume=$2, prenume=$3, prenume_tata=$4, data_nasterii=$5,
+        sex=$6::sex,
+        adresa_domiciliu=$7, cod_postal=$8, iban=$9, telefon=$10, email=$11,
+        stare=$12::stare_persoana_fizica,
+        wallet=$13, updated_at=$14
+    WHERE id=$15
+    RETURNING id, cnp, nume, prenume, prenume_tata, data_nasterii,
+              sex::text AS sex,
+              adresa_domiciliu, cod_postal, iban, telefon, email,
+              stare::text AS stare,
+              wallet, created_at, updated_at
+";
 
 const DELETE_PERSOANA_FIZICA_QUERY: &str = "DELETE FROM persoana_fizica WHERE id = $1";
 

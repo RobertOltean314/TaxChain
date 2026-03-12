@@ -2,7 +2,7 @@ use crate::{
     models::{PersoanaJuridica, PersoanaJuridicaRequest},
     services::persoana_juridica_service::DynPersoanaJuridicaRepository,
 };
-use actix_web::{HttpResponse, Responder, get, post, put, web};
+use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
@@ -14,6 +14,7 @@ pub async fn find_all_persoana_juridica(
     match repo.find_all().await {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
+            eprintln!("find_all persoana_juridica error: {e}"); // ADD THIS
             let error_body = json!({"error": "Failed to retrieve all Persoana Juridica entities", "details": e.to_string()});
             HttpResponse::InternalServerError().json(error_body)
         }
@@ -98,6 +99,7 @@ pub async fn update_persoana_juridica(
     }
 }
 
+#[delete("/{id}")]
 pub async fn delete_persoana_juridica(
     repo: web::Data<DynPersoanaJuridicaRepository>,
     path: web::Path<Uuid>,

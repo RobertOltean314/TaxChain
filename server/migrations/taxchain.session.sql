@@ -1,28 +1,23 @@
 -- -- -- ENUMS
-
 -- DROP TYPE IF EXISTS sex CASCADE;
 -- DROP TYPE IF EXISTS stare_persoana_fizica CASCADE;
 -- DROP TYPE IF EXISTS stare_persoana_juridica CASCADE;
 -- DROP TYPE IF EXISTS functie_reprezentant CASCADE;
-
 -- CREATE TYPE sex AS ENUM (
 --     'M',
 --     'F'
 -- );
-
 -- CREATE TYPE stare_persoana_fizica AS ENUM (
 --     'Activ',
 --     'Inactiv',
 --     'Suspendat'
 -- );
-
 -- CREATE TYPE stare_persoana_juridica AS ENUM (
 --     'Activa',
 --     'Radiata',
 --     'Suspendata',
 --     'In insolventa'
 -- );
-
 -- CREATE TYPE functie_reprezentant AS ENUM (
 --     'Administrator',
 --     'Director General',
@@ -33,13 +28,10 @@
 --     'Actionar',
 --     'Manager'
 -- );
-
 -- -- -- TABLES
-
 -- DROP TABLE IF EXISTS reprezentanti_persoana_juridica CASCADE;
 -- DROP TABLE IF EXISTS persoana_juridica CASCADE;
 -- DROP TABLE IF EXISTS persoana_fizica CASCADE;
-
 -- CREATE TABLE IF NOT EXISTS persoana_fizica (
 --     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 --     cnp VARCHAR(13) NOT NULL UNIQUE,
@@ -58,7 +50,6 @@
 --     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 --     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 -- );
-
 -- CREATE TABLE IF NOT EXISTS persoana_juridica (
 --     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 --     cod_fiscal VARCHAR(10) NOT NULL UNIQUE,
@@ -80,7 +71,6 @@
 --     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 --     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 -- );
-
 -- CREATE TABLE IF NOT EXISTS reprezentanti_persoana_juridica (
 --     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 --     persoana_juridica_id UUID NOT NULL REFERENCES persoana_juridica(id) ON DELETE CASCADE,
@@ -91,10 +81,9 @@
 --     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 --     UNIQUE(persoana_juridica_id, persoana_fizica_id, functie)
 -- );
-
 -- -- -- QUERIES
-
-SELECT * FROM persoana_fizica;
--- SELECT * FROM persoana_juridica;
+-- SELECT * FROM persoana_fizica;
+SELECT * FROM persoana_juridica;
 -- SELECT * FROM reprezentanti_persoana_juridica
 
+ALTER TABLE persoana_juridica ALTER COLUMN wallet SET NOT NULL;
