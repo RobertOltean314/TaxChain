@@ -4194,6 +4194,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "ethers",
+ "futures-util",
  "jsonwebtoken 9.3.1",
  "lazy_static",
  "oauth2",

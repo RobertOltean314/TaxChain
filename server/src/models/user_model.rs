@@ -62,7 +62,7 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 impl User {
-    pub fn from_goole(
+    pub fn from_google(
         google_id: String,
         email: Option<String>,
         display_name: Option<String>,
