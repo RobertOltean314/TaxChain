@@ -4204,6 +4204,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sqlx",
+ "thiserror 2.0.18",
  "uuid 1.21.0",
  "validator",
 ]
