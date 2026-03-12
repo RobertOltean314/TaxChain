@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use actix_cors::Cors;
+use actix_web::http::header;
 use actix_web::{App, HttpServer, web};
 use reqwest::Client;
 use taxchain::{
@@ -56,7 +58,14 @@ async fn main() -> std::io::Result<()> {
     let http_client = Client::new();
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("http://localhost:5173") // Vite dev server
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+            .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE])
+            .max_age(3600);
+
         App::new()
+            .wrap(cors)
             // -- Shared state --
             .app_data(web::Data::new(pf_repo.clone()))
             .app_data(web::Data::new(pj_repo.clone()))

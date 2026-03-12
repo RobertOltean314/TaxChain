@@ -202,22 +202,24 @@
 -- VERIFICATION QUERIES (run manually to confirm migration applied correctly)
 -- ============================================================================
 
-SELECT table_name FROM information_schema.tables
-    WHERE table_schema = 'public'
-    ORDER BY table_name;
+-- SELECT table_name FROM information_schema.tables
+--     WHERE table_schema = 'public'
+--     ORDER BY table_name;
 
-SELECT typname, enumlabel FROM pg_enum
-    JOIN pg_type ON pg_enum.enumtypid = pg_type.oid
-    WHERE typname = 'user_role';
+-- SELECT typname, enumlabel FROM pg_enum
+--     JOIN pg_type ON pg_enum.enumtypid = pg_type.oid
+--     WHERE typname = 'user_role';
 
-SELECT column_name, data_type, is_nullable, column_default
-    FROM information_schema.columns
-    WHERE table_name = 'users'
-    ORDER BY ordinal_position;
+-- SELECT column_name, data_type, is_nullable, column_default
+--     FROM information_schema.columns
+--     WHERE table_name = 'users'
+--     ORDER BY ordinal_position;
 
-SELECT indexname, indexdef
-    FROM pg_indexes
-    WHERE tablename IN ('users', 'auth_nonces', 'refresh_tokens',
-                        'persoana_fizica', 'persoana_juridica',
-                        'reprezentanti_persoana_juridica')
-    ORDER BY tablename, indexname;
+-- SELECT indexname, indexdef
+--     FROM pg_indexes
+--     WHERE tablename IN ('users', 'auth_nonces', 'refresh_tokens',
+--                         'persoana_fizica', 'persoana_juridica',
+--                         'reprezentanti_persoana_juridica')
+--     ORDER BY tablename, indexname;
+
+-- ALTER TABLE auth_nonces ALTER COLUMN nonce TYPE TEXT;

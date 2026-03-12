@@ -15,12 +15,14 @@ const INSERT_USER_QUERY: &str = "
         persoana_fizica_id, persoana_juridica_id,
         created_at, updated_at
     ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+        $1, $2, $3, $4, $5, $6, $7, $8::user_role, $9, $10, $11, $12, $13
     )
     RETURNING
         id, google_id, wallet_address,
         assigned_wallet_address, assigned_wallet_key_enc,
-        email, display_name, role, is_active,
+        email, display_name,
+        role::text AS role,  
+        is_active,
         persoana_fizica_id, persoana_juridica_id,
         created_at, updated_at
 ";
@@ -28,7 +30,9 @@ const INSERT_USER_QUERY: &str = "
 const FIND_USER_BY_ID_QUERY: &str = "
     SELECT id, google_id, wallet_address,
            assigned_wallet_address, assigned_wallet_key_enc,
-           email, display_name, role, is_active,
+           email, display_name,
+           role::text AS role,
+           is_active,
            persoana_fizica_id, persoana_juridica_id,
            created_at, updated_at
     FROM users WHERE id = $1
@@ -37,7 +41,9 @@ const FIND_USER_BY_ID_QUERY: &str = "
 const FIND_USER_BY_GOOGLE_ID_QUERY: &str = "
     SELECT id, google_id, wallet_address,
            assigned_wallet_address, assigned_wallet_key_enc,
-           email, display_name, role, is_active,
+           email, display_name,
+           role::text AS role,
+           is_active,
            persoana_fizica_id, persoana_juridica_id,
            created_at, updated_at
     FROM users WHERE google_id = $1
@@ -46,7 +52,9 @@ const FIND_USER_BY_GOOGLE_ID_QUERY: &str = "
 const FIND_USER_BY_WALLET_ADDRESS_QUERY: &str = "
     SELECT id, google_id, wallet_address,
            assigned_wallet_address, assigned_wallet_key_enc,
-           email, display_name, role, is_active,
+           email, display_name,
+           role::text AS role,
+           is_active,
            persoana_fizica_id, persoana_juridica_id,
            created_at, updated_at
     FROM users WHERE wallet_address = $1
@@ -61,7 +69,9 @@ const UPDATE_USER_ENTITY_LINKS_QUERY: &str = "
     RETURNING
         id, google_id, wallet_address,
         assigned_wallet_address, assigned_wallet_key_enc,
-        email, display_name, role, is_active,
+        email, display_name,
+        role::text AS role,
+        is_active,
         persoana_fizica_id, persoana_juridica_id,
         created_at, updated_at
 ";

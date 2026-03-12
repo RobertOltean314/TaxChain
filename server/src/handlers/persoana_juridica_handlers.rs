@@ -14,6 +14,7 @@ pub async fn find_all_persoana_juridica(
     match repo.find_all().await {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
+            eprintln!("find_all persoana_juridica error: {e}"); // ADD THIS
             let error_body = json!({"error": "Failed to retrieve all Persoana Juridica entities", "details": e.to_string()});
             HttpResponse::InternalServerError().json(error_body)
         }

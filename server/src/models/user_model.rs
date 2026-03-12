@@ -4,12 +4,13 @@ use sqlx::Type;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[sqlx(type_name = "user_role")]
+#[sqlx(type_name = "user_role", rename_all = "PascalCase")]
 pub enum UserRole {
     Admin,
     Taxpayer,
     Auditor,
 }
+
 impl UserRole {
     pub fn as_str(&self) -> &'static str {
         match self {
