@@ -10,10 +10,19 @@ pub fn encode_token(
     user_id: Uuid,
     wallet: String,
     role: UserRole,
+    persoana_fizica_id: Option<Uuid>,
+    persoana_juridica_id: Option<Uuid>,
     secret: &str,
     ttl_seconds: i64,
 ) -> Result<String, jsonwebtoken::errors::Error> {
-    let claims = Claims::new(user_id, wallet, role, ttl_seconds);
+    let claims = Claims::new(
+        user_id,
+        persoana_fizica_id,
+        persoana_juridica_id,
+        wallet,
+        role,
+        ttl_seconds,
+    );
     encode(
         &Header::default(),
         &claims,
@@ -55,15 +64,67 @@ mod tests {
         let user_id = Uuid::new_v4();
         let wallet = "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12".to_string();
         let role = UserRole::Taxpayer;
+        let pf_id = Uuid::new_v4();
 
-        let token = encode_token(user_id, wallet.clone(), role, TEST_SECRET, 3600)
-            .expect("encode should succeed");
+        let token = encode_token(
+            user_id,
+            wallet.clone(),
+            role,
+            Some(pf_id),
+            None,
+            TEST_SECRET,
+            3600,
+        )
+        .expect("encode should succeed");
 
         let claims = decode_token(&token, TEST_SECRET).expect("decode should succeed");
 
         assert_eq!(claims.user_id().unwrap(), user_id);
         assert_eq!(claims.wallet, wallet);
         assert_eq!(claims.role, UserRole::Taxpayer);
+        assert_eq!(claims.persoana_fizica_id, Some(pf_id));
+        assert_eq!(claims.persoana_juridica_id, None);
+    }
+
+    #[test]
+    fn entity_ids_are_none_when_not_linked() {
+        let token = encode_token(
+            Uuid::new_v4(),
+            "0x0000000000000000000000000000000000000000".to_string(),
+            UserRole::Taxpayer,
+            None,
+            None,
+            TEST_SECRET,
+            3600,
+        )
+        .expect("encode should succeed");
+
+        let claims = decode_token(&token, TEST_SECRET).expect("decode should succeed");
+
+        assert_eq!(claims.persoana_fizica_id, None);
+        assert_eq!(claims.persoana_juridica_id, None);
+    }
+
+    #[test]
+    fn both_entity_ids_survive_round_trip() {
+        let pf_id = Uuid::new_v4();
+        let pj_id = Uuid::new_v4();
+
+        let token = encode_token(
+            Uuid::new_v4(),
+            "0x0000000000000000000000000000000000000000".to_string(),
+            UserRole::Admin,
+            Some(pf_id),
+            Some(pj_id),
+            TEST_SECRET,
+            3600,
+        )
+        .expect("encode should succeed");
+
+        let claims = decode_token(&token, TEST_SECRET).expect("decode should succeed");
+
+        assert_eq!(claims.persoana_fizica_id, Some(pf_id));
+        assert_eq!(claims.persoana_juridica_id, Some(pj_id));
     }
 
     #[test]
@@ -73,6 +134,8 @@ mod tests {
             user_id,
             "0x0000000000000000000000000000000000000000".to_string(),
             UserRole::Taxpayer,
+            None,
+            None,
             TEST_SECRET,
             -1, // already expired
         )
@@ -88,6 +151,8 @@ mod tests {
             Uuid::new_v4(),
             "0x0000000000000000000000000000000000000000".to_string(),
             UserRole::Admin,
+            None,
+            None,
             TEST_SECRET,
             3600,
         )
@@ -104,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn refresh_token_hash_differs_for_different_tokens() {
+    fn different_raw_tokens_produce_different_hashes() {
         let a = generate_refresh_token();
         let b = generate_refresh_token();
         assert_ne!(hash_refresh_token(&a), hash_refresh_token(&b));

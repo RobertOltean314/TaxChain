@@ -68,6 +68,8 @@ async fn issue_tokens(
         user.id,
         user.assigned_wallet_address.clone(),
         user.role,
+        user.persoana_fizica_id,
+        user.persoana_juridica_id,
         &config.jwt_secret,
         config.access_token_ttl,
     )

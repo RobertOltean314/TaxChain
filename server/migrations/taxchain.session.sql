@@ -91,4 +91,6 @@
 -- ALTER TABLE users
 --     ALTER COLUMN assigned_wallet_key_enc DROP NOT NULL;
 
- DELETE FROM users;
+UPDATE users
+SET role = 'Admin'
+WHERE email = 'olteanrobertadrian314@gmail.com'
