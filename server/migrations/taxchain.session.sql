@@ -83,7 +83,12 @@
 -- );
 -- -- -- QUERIES
 -- SELECT * FROM persoana_fizica;
-SELECT * FROM persoana_juridica;
+-- SELECT * FROM persoana_juridica;
 -- SELECT * FROM reprezentanti_persoana_juridica
 
-ALTER TABLE persoana_juridica ALTER COLUMN wallet SET NOT NULL;
+-- ALTER TABLE persoana_juridica ALTER COLUMN wallet SET NOT NULL;
+
+-- ALTER TABLE users
+--     ALTER COLUMN assigned_wallet_key_enc DROP NOT NULL;
+
+ DELETE FROM users;
