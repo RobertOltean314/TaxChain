@@ -1,8 +1,23 @@
-pub fn generate_custodial_wallet() -> Result<(String, String), Box<dyn std::error::Error>> {
-    // TODO Phase 2: implement real HD wallet derivation
-    let unique_id = uuid::Uuid::new_v4().to_string().replace("-", "");
-    // UUID without hyphens is 32 chars — pad to 40 with zeros
-    let dummy_address = format!("0x{:0<40}", unique_id);
-    let dummy_key_enc = format!("dummy_key_{}", unique_id);
-    Ok((dummy_address, dummy_key_enc))
+use ethers::{
+    signers::{LocalWallet, Signer},
+    utils::{hex, to_checksum},
+};
+use rand::thread_rng;
+
+use crate::wallet::{WalletEncryptionError, encryption::encrypt_private_key};
+
+pub fn generate_custodial_wallet() -> Result<(String, String), WalletEncryptionError> {
+    // 1. Generate wallet
+    let wallet = LocalWallet::new(&mut thread_rng());
+
+    // 2. EIP-55 checksummed address
+    let wallet_address = to_checksum(&wallet.address(), None);
+
+    // 3. Generate private key from wallet address
+    let private_key_hex = format!("0x{}", hex::encode(wallet.signer().to_bytes()));
+
+    // 4. Encrypt the private key
+    let private_key_enc = encrypt_private_key(&private_key_hex, None)?;
+
+    Ok((wallet_address, private_key_enc))
 }
