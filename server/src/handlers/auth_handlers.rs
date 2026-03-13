@@ -15,7 +15,7 @@ use crate::{
         user_model::{User, UserResponse},
     },
     services::user_service::DynUserRepository,
-    wallet::generator::generate_custodial_wallet,
+    wallet::generate_custodial_wallet,
 };
 
 #[derive(Clone)]

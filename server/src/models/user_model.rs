@@ -46,7 +46,7 @@ pub struct User {
     // Custodial wallet
     pub assigned_wallet_address: String,
     #[serde(skip_serializing)]
-    pub assigned_wallet_key_enc: String,
+    pub assigned_wallet_key_enc: Option<String>,
 
     // Profile
     pub email: Option<String>,
@@ -68,15 +68,15 @@ impl User {
         email: Option<String>,
         display_name: Option<String>,
         assigned_wallet_address: String,
-        assigned_wallet_key_enc: String,
+        wallet_key_enc: String,
     ) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             google_id: Some(google_id),
-            wallet_address: None,
+            wallet_address: Some(assigned_wallet_address.clone()),
             assigned_wallet_address,
-            assigned_wallet_key_enc,
+            assigned_wallet_key_enc: Some(wallet_key_enc),
             email,
             display_name,
             role: UserRole::Taxpayer,
@@ -95,7 +95,7 @@ impl User {
             google_id: None,
             wallet_address: Some(wallet_address.clone()),
             assigned_wallet_address: wallet_address,
-            assigned_wallet_key_enc: String::new(),
+            assigned_wallet_key_enc: None,
             email: None,
             display_name: None,
             role: UserRole::Taxpayer,
@@ -114,7 +114,7 @@ pub struct UserRow {
     pub google_id: Option<String>,
     pub wallet_address: Option<String>,
     pub assigned_wallet_address: String,
-    pub assigned_wallet_key_enc: String,
+    pub assigned_wallet_key_enc: Option<String>,
     pub email: Option<String>,
     pub display_name: Option<String>,
     pub role: String,
