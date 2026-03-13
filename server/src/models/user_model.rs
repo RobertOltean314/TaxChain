@@ -88,18 +88,14 @@ impl User {
         }
     }
 
-    pub fn from_wallet(
-        wallet_address: String,
-        assigned_wallet_address: String,
-        assigned_wallet_key_enc: String,
-    ) -> Self {
+    pub fn from_wallet(wallet_address: String) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             google_id: None,
-            wallet_address: Some(wallet_address),
-            assigned_wallet_address,
-            assigned_wallet_key_enc,
+            wallet_address: Some(wallet_address.clone()),
+            assigned_wallet_address: wallet_address,
+            assigned_wallet_key_enc: String::new(),
             email: None,
             display_name: None,
             role: UserRole::Taxpayer,

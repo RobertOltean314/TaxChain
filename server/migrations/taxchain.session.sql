@@ -83,7 +83,7 @@
 -- );
 -- -- -- QUERIES
 -- SELECT * FROM persoana_fizica;
-SELECT * FROM persoana_juridica;
+-- SELECT * FROM persoana_juridica;
 -- SELECT * FROM reprezentanti_persoana_juridica
 
-ALTER TABLE persoana_juridica ALTER COLUMN wallet SET NOT NULL;
+-- ALTER TABLE persoana_juridica ALTER COLUMN wallet SET NOT NULL;

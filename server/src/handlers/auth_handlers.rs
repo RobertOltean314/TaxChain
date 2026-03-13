@@ -210,6 +210,7 @@ pub async fn wallet_nonce_handler(
         }
     }
 }
+
 #[post("/wallet/verify")]
 pub async fn wallet_verify_handler(
     body: web::Json<WalletVerifyRequest>,
@@ -234,8 +235,8 @@ pub async fn wallet_verify_handler(
     };
 
     // 2. Verify the signature
-    if let Err(error) = verify_siwe_signature(&body.address, &body.signature, &stored_nonce) {
-        let mut status = match error {
+    if let Err(e) = verify_siwe_signature(&body.address, &body.signature, &stored_nonce) {
+        let mut status = match e {
             SiweError::NonceExpired | SiweError::NonceNotFound(_) => HttpResponse::Unauthorized(),
             SiweError::InvalidSignature(_) | SiweError::AddressMismatch { .. } => {
                 HttpResponse::Unauthorized()
@@ -243,7 +244,7 @@ pub async fn wallet_verify_handler(
         };
         return status.json(json!({
             "error": "Signature verification failed",
-            "details": error.to_string()
+            "details": e.to_string()
         }));
     }
 
@@ -257,18 +258,10 @@ pub async fn wallet_verify_handler(
     let user = match repo.find_by_wallet_address(&body.address).await {
         Ok(Some(existing)) => existing,
         Ok(None) => {
-            let (wallet_address, wallet_key_enc) = match generate_custodial_wallet() {
-                Ok(pair) => pair,
-                Err(e) => {
-                    eprintln!("Wallet generation error: {e}");
-                    return HttpResponse::InternalServerError().json(json!({
-                        "error": "Failed to generate wallet",
-                        "details": e.to_string()
-                    }));
-                }
-            };
-
-            let new_user = User::from_wallet(body.address.clone(), wallet_address, wallet_key_enc);
+            // The login wallet IS the assigned wallet — the user owns their private key,
+            // so no custodial wallet is generated. Custodial wallets are only created
+            // for Google users who don't have a wallet of their own.
+            let new_user = User::from_wallet(body.address.clone());
 
             match repo.create(new_user).await {
                 Ok(u) => u,
