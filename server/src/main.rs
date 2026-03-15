@@ -82,7 +82,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope("/persoana-fizica")
-                    // .wrap(JwtAuthMiddleware)   ← uncomment in Phase 3
+                    .wrap(JwtAuthMiddleware)
                     .service(find_all_persoana_fizica)
                     .service(get_persoana_fizica_by_id)
                     .service(create_persoana_fizica)
@@ -91,7 +91,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope("/persoana-juridica")
-                    // .wrap(JwtAuthMiddleware)   ← uncomment in Phase 3
+                    .wrap(JwtAuthMiddleware)
                     .service(find_all_persoana_juridica)
                     .service(get_persoana_juridica_by_id)
                     .service(create_persoana_juridica)
