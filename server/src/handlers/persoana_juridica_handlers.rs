@@ -1,16 +1,22 @@
 use crate::{
-    models::{PersoanaJuridica, PersoanaJuridicaRequest},
+    auth::middleware::require_role,
+    models::{PersoanaJuridica, PersoanaJuridicaRequest, UserRole},
     services::persoana_juridica_service::DynPersoanaJuridicaRepository,
 };
-use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
 #[get("")]
 pub async fn find_all_persoana_juridica(
+    req: HttpRequest,
     repo: web::Data<DynPersoanaJuridicaRepository>,
 ) -> impl Responder {
+    if let Err(resp) = require_role(&req, &[UserRole::Admin, UserRole::Auditor]) {
+        return resp;
+    }
+
     match repo.find_all().await {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
@@ -23,10 +29,28 @@ pub async fn find_all_persoana_juridica(
 
 #[get("/{id}")]
 pub async fn get_persoana_juridica_by_id(
+    req: HttpRequest,
     repo: web::Data<DynPersoanaJuridicaRepository>,
     path: web::Path<Uuid>,
 ) -> impl Responder {
+    let user = match require_role(
+        &req,
+        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+    ) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
     let id = path.into_inner();
+
+    if user.claims().role == UserRole::Taxpayer {
+        if user.claims().persoana_fizica_id != Some(id) {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "Access denied — you can only view your own record"
+            }));
+        }
+    }
+
     let not_found_error =
         json!({"error": format!("Persoana Juridica with id {} was not found", id)});
     match repo.find_by_id(id).await {
@@ -44,9 +68,14 @@ pub async fn get_persoana_juridica_by_id(
 
 #[post("")]
 pub async fn create_persoana_juridica(
+    req: HttpRequest,
     repo: web::Data<DynPersoanaJuridicaRepository>,
     body: web::Json<PersoanaJuridicaRequest>,
 ) -> impl Responder {
+    if let Err(resp) = require_role(&req, &[UserRole::Admin]) {
+        return resp;
+    }
+
     if let Err(errors) = body.validate() {
         return HttpResponse::BadRequest().body(errors.to_string());
     }
@@ -64,14 +93,29 @@ pub async fn create_persoana_juridica(
 
 #[put("/{id}")]
 pub async fn update_persoana_juridica(
+    req: HttpRequest,
     repo: web::Data<DynPersoanaJuridicaRepository>,
     path: web::Path<Uuid>,
     body: web::Json<PersoanaJuridicaRequest>,
 ) -> impl Responder {
+    let user = match require_role(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
     if let Err(errors) = body.validate() {
         return HttpResponse::BadRequest().body(errors.to_string());
     }
     let id = path.into_inner();
+
+    if user.claims().role == UserRole::Taxpayer {
+        if user.claims().persoana_fizica_id != Some(id) {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "Access denied — you can only update your own record"
+            }));
+        }
+    }
+
     let not_found_error = json!({"error": format!("Persoana Juridica with id {id} not found")});
 
     let existing = match repo.find_by_id(id).await {
@@ -101,10 +145,16 @@ pub async fn update_persoana_juridica(
 
 #[delete("/{id}")]
 pub async fn delete_persoana_juridica(
+    req: HttpRequest,
     repo: web::Data<DynPersoanaJuridicaRepository>,
     path: web::Path<Uuid>,
 ) -> impl Responder {
+    if let Err(resp) = require_role(&req, &[UserRole::Admin]) {
+        return resp;
+    }
+
     let id = path.into_inner();
+
     let success_body =
         json!({"success": format!("The entity with id {} was successfully deleted", id)});
     let not_found_error_body =

@@ -23,6 +23,8 @@ pub struct RefreshToken {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String, // user uuid
+    pub persoana_fizica_id: Option<Uuid>,
+    pub persoana_juridica_id: Option<Uuid>,
     pub wallet: String,
     pub role: UserRole,
     pub iat: i64,
@@ -30,11 +32,20 @@ pub struct Claims {
 }
 
 impl Claims {
-    pub fn new(user_id: Uuid, wallet: String, role: UserRole, ttl_seconds: i64) -> Self {
+    pub fn new(
+        user_id: Uuid,
+        persoana_fizica_id: Option<Uuid>,
+        persoana_juridica_id: Option<Uuid>,
+        wallet: String,
+        role: UserRole,
+        ttl_seconds: i64,
+    ) -> Self {
         let now = Utc::now().timestamp();
 
         Self {
             sub: user_id.to_string(),
+            persoana_fizica_id,
+            persoana_juridica_id,
             wallet,
             role,
             iat: now,
