@@ -1,17 +1,19 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
 
-export function UnauthorizedPage() {
+export default function UnauthorizedPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center p-8">
-      <div className="text-center">
-        <p className="font-mono text-6xl text-surface-border mb-4">403</p>
-        <h1 className="font-display text-2xl text-white mb-2">Acces interzis</h1>
-        <p className="text-slate-400 text-sm mb-8">
-          Nu aveți permisiunea de a accesa această pagină.
-        </p>
-        <button className="btn-secondary" onClick={() => navigate('/dashboard')}>
-          ← Dashboard
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
+      <div className="text-center fade-up">
+        <p className="font-display text-8xl mb-4" style={{ color: "var(--border)" }}>403</p>
+        <h1 className="text-xl font-semibold mb-2" style={{ color: "var(--text)" }}>Acces interzis</h1>
+        <p className="text-sm mb-6" style={{ color: "var(--text-sub)" }}>Nu ai permisiunile necesare pentru această pagină.</p>
+        <button onClick={() => navigate(user ? "/dashboard" : "/login")}
+          className="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
+          style={{ color: "var(--amber)", background: "var(--amber-bg)", borderColor: "var(--amber-dim)" }}>
+          {user ? "← Dashboard" : "← Autentificare"}
         </button>
       </div>
     </div>

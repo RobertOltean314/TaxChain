@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::models::partner_model::{EntityType, Partner, PartnerType};
 
 const SELECT_COLS: &str = "
-    SELECT id, denumire, cod_fiscal, numar_reg_com,
+    SELECT id, denumire, cod_fiscal, numar_in_registrul_comertului,
            tip::text AS tip,
            tip_entitate::text AS tip_entitate,
            adresa, cod_postal, oras, tara,
@@ -20,7 +20,7 @@ const SELECT_COLS: &str = "
 
 const CREATE_QUERY: &str = "
     INSERT INTO partener
-        (id, denumire, cod_fiscal, numar_reg_com,
+        (id, denumire, cod_fiscal, numar_in_registrul_comertului,
          tip, tip_entitate,
          adresa, cod_postal, oras, tara,
          email, telefon, iban,
@@ -32,7 +32,7 @@ const CREATE_QUERY: &str = "
             $11,$12,$13,
             $14,$15,
             $16,$17,$18)
-    RETURNING id, denumire, cod_fiscal, numar_reg_com,
+    RETURNING id, denumire, cod_fiscal, numar_in_registrul_comertului,
               tip::text AS tip,
               tip_entitate::text AS tip_entitate,
               adresa, cod_postal, oras, tara,
@@ -43,14 +43,14 @@ const CREATE_QUERY: &str = "
 
 const UPDATE_QUERY: &str = "
     UPDATE partener
-    SET denumire=$1, cod_fiscal=$2, numar_reg_com=$3,
+    SET denumire=$1, cod_fiscal=$2, numar_in_registrul_comertului=$3,
         tip=$4::tip_partener, tip_entitate=$5::tip_entitate,
         adresa=$6, cod_postal=$7, oras=$8, tara=$9,
         email=$10, telefon=$11, iban=$12,
         persoana_fizica_id=$13, persoana_juridica_id=$14,
         updated_at=$15
     WHERE id=$16 AND created_by=$17
-    RETURNING id, denumire, cod_fiscal, numar_reg_com,
+    RETURNING id, denumire, cod_fiscal, numar_in_registrul_comertului,
               tip::text AS tip,
               tip_entitate::text AS tip_entitate,
               adresa, cod_postal, oras, tara,

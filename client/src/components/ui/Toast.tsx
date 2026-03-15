@@ -1,80 +1,41 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 
-type ToastVariant = 'success' | 'error' | 'warning' | 'info';
+type Kind = "ok" | "err" | "info";
+interface T { id: number; msg: string; kind: Kind; }
+interface Ctx { toast: (msg: string, kind?: Kind) => void; }
 
-interface Toast {
-  id: string;
-  message: string;
-  variant: ToastVariant;
-}
+export const ToastCtx = createContext<Ctx>({} as Ctx);
+export const useToast = () => useContext(ToastCtx);
 
-interface ToastContextValue {
-  toast: (message: string, variant?: ToastVariant) => void;
-}
+let _n = 0;
 
-const ToastContext = createContext<ToastContextValue | null>(null);
+const STYLE: Record<Kind, string> = {
+  ok:   "border-[var(--green)]   bg-[var(--green-bg)]   text-[var(--green)]",
+  err:  "border-[var(--red)]     bg-[var(--red-bg)]     text-[var(--red)]",
+  info: "border-[var(--amber)]   bg-[var(--amber-bg)]   text-[var(--amber)]",
+};
+const ICON: Record<Kind, string> = { ok: "✓", err: "✕", info: "◆" };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toasts, set] = useState<T[]>([]);
 
-  const toast = useCallback((message: string, variant: ToastVariant = 'info') => {
-    const id = Math.random().toString(36).slice(2);
-    setToasts((prev) => [...prev, { id, message, variant }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+  const toast = useCallback((msg: string, kind: Kind = "info") => {
+    const id = ++_n;
+    set((p) => [...p, { id, msg, kind }]);
+    setTimeout(() => set((p) => p.filter((t) => t.id !== id)), 4000);
   }, []);
 
-  const variantClasses: Record<ToastVariant, string> = {
-    success: 'border-success/30 bg-success/10 text-success',
-    error: 'border-danger/30 bg-danger/10 text-danger',
-    warning: 'border-warning/30 bg-warning/10 text-warning',
-    info: 'border-brand/30 bg-brand/10 text-blue-300',
-  };
-
-  const icons: Record<ToastVariant, string> = {
-    success: '✓',
-    error: '✕',
-    warning: '⚠',
-    info: 'ℹ',
-  };
-
   return (
-    <ToastContext.Provider value={{ toast }}>
+    <ToastCtx.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`flex items-start gap-2.5 px-4 py-3 rounded-lg border text-sm font-medium
-                        shadow-lg backdrop-blur-sm pointer-events-auto
-                        animate-[slideIn_0.2s_ease-out]
-                        ${variantClasses[t.variant]}`}
-            style={{ minWidth: 260, maxWidth: 380 }}
-          >
-            <span className="text-base leading-none mt-px">{icons[t.variant]}</span>
-            <span>{t.message}</span>
+          <div key={t.id} className={`fade-up flex items-center gap-2.5 px-4 py-3 rounded-lg border text-sm font-medium backdrop-blur-sm shadow-2xl ${STYLE[t.kind]}`}>
+            <span className="text-xs font-mono">{ICON[t.kind]}</span>
+            {t.msg}
           </div>
         ))}
       </div>
-      <style>{`
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(20px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
-    </ToastContext.Provider>
+    </ToastCtx.Provider>
   );
-}
-
-export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used inside <ToastProvider>');
-  return ctx;
 }

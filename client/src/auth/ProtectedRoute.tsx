@@ -1,32 +1,19 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from './useAuth';
-import type { UserResponse } from '../types';
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "./useAuth";
 
-interface ProtectedRouteProps {
-  allowedRoles?: UserResponse['role'][];
-}
+interface Props { roles: string[]; }
 
-export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
+export default function ProtectedRoute({ roles }: Props) {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-surface">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-slate-400">Se încarcă...</span>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-screen" style={{ background: "var(--bg)" }}>
+      <div className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
+        style={{ borderColor: "var(--amber)" }} />
+    </div>
+  );
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
+  if (!user) return <Navigate to="/login" replace />;
+  if (!roles.includes(user.role)) return <Navigate to="/unauthorized" replace />;
   return <Outlet />;
 }

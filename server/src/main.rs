@@ -110,7 +110,7 @@ async fn main() -> std::io::Result<()> {
                     .service(delete_persoana_juridica),
             )
             .service(
-                web::scope("/partner")
+                web::scope("/partener")
                     .wrap(JwtAuthMiddleware)
                     .service(find_all_partener)
                     .service(get_partener_by_id)
