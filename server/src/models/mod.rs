@@ -1,4 +1,5 @@
 pub mod auth_models;
+pub mod partner_model;
 pub mod persoana_fizica_model;
 pub mod persoana_juridica_model;
 pub mod user_model;
