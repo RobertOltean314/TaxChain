@@ -14,10 +14,20 @@ use taxchain::{
         create_persoana_fizica, create_persoana_juridica, delete_persoana_fizica,
         delete_persoana_juridica, find_all_persoana_fizica, find_all_persoana_juridica,
         get_persoana_fizica_by_id,
+        invoice_handlers::{
+            create_invoice, delete_invoice, find_all_invoices, get_invoice_by_id, update_invoice,
+            update_invoice_payment, update_invoice_status,
+        },
+        partner_handlers::{
+            create_partener, delete_partener, find_all_partener, get_partener_by_id,
+            update_partener,
+        },
         persoana_juridica_handlers::get_persoana_juridica_by_id,
         update_persoana_fizica, update_persoana_juridica,
     },
     services::{
+        invoice_service::{DynInvoiceRepository, PgInvoiceRepository},
+        partner_service::{DynPartnerRepository, PgPartnerRepository},
         persoana_fizica_service::{DynPersoanaFizicaRepository, PgPersoanaFizicaRepository},
         persoana_juridica_service::{DynPersoanaJuridicaRepository, PgPersoanaJuridicaRepository},
         user_service::{DynUserRepository, PgUserRepository},
@@ -42,11 +52,11 @@ async fn main() -> std::io::Result<()> {
 
     let pf_repo: DynPersoanaFizicaRepository =
         Arc::new(PgPersoanaFizicaRepository::new(pool.clone()));
-
     let pj_repo: DynPersoanaJuridicaRepository =
         Arc::new(PgPersoanaJuridicaRepository::new(pool.clone()));
-
     let user_repo: DynUserRepository = Arc::new(PgUserRepository::new(pool.clone()));
+    let partener_repo: DynPartnerRepository = Arc::new(PgPartnerRepository::new(pool.clone()));
+    let invoice_repo: DynInvoiceRepository = Arc::new(PgInvoiceRepository::new(pool.clone()));
 
     let auth_config = AuthConfig {
         jwt_secret,
@@ -60,18 +70,19 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://localhost:5173") // Vite dev server
-            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+            .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
             .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE])
             .max_age(3600);
 
         App::new()
             .wrap(cors)
-            // -- Shared state --
             .app_data(web::Data::new(pf_repo.clone()))
             .app_data(web::Data::new(pj_repo.clone()))
             .app_data(web::Data::new(user_repo.clone()))
             .app_data(web::Data::new(auth_config.clone()))
             .app_data(web::Data::new(http_client.clone()))
+            .app_data(web::Data::new(partener_repo.clone()))
+            .app_data(web::Data::new(invoice_repo.clone()))
             .service(
                 web::scope("/auth")
                     .service(google_login_handler)
@@ -97,6 +108,26 @@ async fn main() -> std::io::Result<()> {
                     .service(create_persoana_juridica)
                     .service(update_persoana_juridica)
                     .service(delete_persoana_juridica),
+            )
+            .service(
+                web::scope("/partner")
+                    .wrap(JwtAuthMiddleware)
+                    .service(find_all_partener)
+                    .service(get_partener_by_id)
+                    .service(create_partener)
+                    .service(update_partener)
+                    .service(delete_partener),
+            )
+            .service(
+                web::scope("/invoice")
+                    .wrap(JwtAuthMiddleware)
+                    .service(find_all_invoices)
+                    .service(get_invoice_by_id)
+                    .service(create_invoice)
+                    .service(update_invoice)
+                    .service(update_invoice_status)
+                    .service(update_invoice_payment)
+                    .service(delete_invoice),
             )
     })
     .bind(("127.0.0.1", 8080))?

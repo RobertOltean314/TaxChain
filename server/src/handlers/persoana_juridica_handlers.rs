@@ -44,7 +44,7 @@ pub async fn get_persoana_juridica_by_id(
     let id = path.into_inner();
 
     if user.claims().role == UserRole::Taxpayer {
-        if user.claims().persoana_fizica_id != Some(id) {
+        if user.claims().persoana_juridica_id != Some(id) {
             return HttpResponse::Forbidden().json(json!({
                 "error": "Access denied — you can only view your own record"
             }));
@@ -109,7 +109,7 @@ pub async fn update_persoana_juridica(
     let id = path.into_inner();
 
     if user.claims().role == UserRole::Taxpayer {
-        if user.claims().persoana_fizica_id != Some(id) {
+        if user.claims().persoana_juridica_id != Some(id) {
             return HttpResponse::Forbidden().json(json!({
                 "error": "Access denied — you can only update your own record"
             }));
