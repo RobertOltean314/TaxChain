@@ -1,35 +1,8 @@
-import api from './axios';
-import type { PersoanaFizica } from '../types';
-import type { PersoanaFizicaFormValues } from '../validation/schemas';
+import api from "./axios";
+import type { PersoanaFizica } from "../types";
 
-export const persoanaFizicaApi = {
-  getAll: async (): Promise<PersoanaFizica[]> => {
-    const { data } = await api.get<PersoanaFizica[]>('/persoana-fizica');
-    return data;
-  },
-
-  getById: async (id: string): Promise<PersoanaFizica> => {
-    const { data } = await api.get<PersoanaFizica>(`/persoana-fizica/${id}`);
-    return data;
-  },
-
-  create: async (payload: PersoanaFizicaFormValues): Promise<PersoanaFizica> => {
-    const { data } = await api.post<PersoanaFizica>('/persoana-fizica', payload);
-    return data;
-  },
-
-  update: async (
-    id: string,
-    payload: PersoanaFizicaFormValues
-  ): Promise<PersoanaFizica> => {
-    const { data } = await api.put<PersoanaFizica>(
-      `/persoana-fizica/${id}`,
-      payload
-    );
-    return data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await api.delete(`/persoana-fizica/${id}`);
-  },
-};
+export const pfGetAll    = async (): Promise<PersoanaFizica[]> => (await api.get("/persoana-fizica")).data;
+export const pfGetById   = async (id: string): Promise<PersoanaFizica> => (await api.get(`/persoana-fizica/${id}`)).data;
+export const pfCreate    = async (body: unknown): Promise<PersoanaFizica> => (await api.post("/persoana-fizica", body)).data;
+export const pfUpdate    = async (id: string, body: unknown): Promise<PersoanaFizica> => (await api.put(`/persoana-fizica/${id}`, body)).data;
+export const pfDelete    = async (id: string): Promise<void> => { await api.delete(`/persoana-fizica/${id}`); };

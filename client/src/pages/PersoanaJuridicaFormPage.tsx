@@ -1,396 +1,216 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { persoanaJuridicaSchema, type PersoanaJuridicaFormValues } from '../validation/schemas';
-import { persoanaJuridicaApi } from '../api/persoanaJuridica.api';
-import { AppLayout } from '../components/ui/AppLayout';
-import { useToast } from '../components/ui/Toast';
-import { useAuth } from '../auth/useAuth';
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useForm, useFieldArray } from "react-hook-form";
+import { pjGetById, pjCreate, pjUpdate } from "../api/persoanaJuridica.api";
+import { useToast } from "../components/ui/Toast";
+import { Card, FieldLabel, FieldError, inputCls, BtnPrimary, BtnGhost, BtnBack } from "../components/ui/ui";
 
-function Field({
-  label,
-  error,
-  required,
-  children,
-}: {
-  label: string;
-  error?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="input-label">
-        {label}
-        {required && <span className="text-danger ml-0.5">*</span>}
-      </label>
-      {children}
-      {error && <p className="input-error">{error}</p>}
-    </div>
-  );
-}
+type F = {
+  cod_fiscal: string;
+  denumire: string;
+  numar_de_inregistrare_in_registrul_comertului: string;
+  an_infiintare: number;
+  adresa_sediu_social: string;
+  cod_postal: string;
+  adresa_puncte_de_lucru: { v: string }[];
+  iban: string;
+  telefon: string;
+  email: string;
+  cod_caen_principal: string;
+  coduri_caen_secundare: { v: string }[];
+  numar_angajati: number;
+  capital_social: number;
+  stare: "Activa" | "Radiata" | "Suspendata" | "InInsolventa";
+};
 
-// Dynamic array input (add/remove string items)
-function ArrayField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  readOnly,
-}: {
-  label: string;
-  value: string[];
-  onChange: (v: string[]) => void;
-  placeholder?: string;
-  readOnly?: boolean;
-}) {
-  const add = () => onChange([...value, '']);
-  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
-  const update = (i: number, v: string) => {
-    const next = [...value];
-    next[i] = v;
-    onChange(next);
-  };
-
-  return (
-    <div>
-      <label className="input-label">{label}</label>
-      <div className="space-y-2">
-        {value.map((item, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              value={item}
-              onChange={(e) => update(i, e.target.value)}
-              className="input-field"
-              placeholder={placeholder}
-              readOnly={readOnly}
-            />
-            {!readOnly && (
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="shrink-0 w-8 h-9 flex items-center justify-center text-slate-500 hover:text-danger transition-colors"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        ))}
-        {!readOnly && (
-          <button
-            type="button"
-            onClick={add}
-            className="text-xs text-brand hover:text-brand-dim transition-colors"
-          >
-            + Adaugă
-          </button>
-        )}
-        {value.length === 0 && readOnly && (
-          <span className="text-xs text-slate-500">—</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Form ─────────────────────────────────────────────────────────────────
-
-export function PersoanaJuridicaFormPage() {
-  const { id } = useParams<{ id: string }>();
-  const isEdit = !!id;
+export default function PersoanaJuridicaFormPage() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isReadOnly = user?.role === 'Auditor';
+  const isEdit = !!id && id !== "new";
 
-  const [adresePuncteLucru, setAdresePuncteLucru] = useState<string[]>([]);
-  const [codurCaenSecundare, setCodurCaenSecundare] = useState<string[]>([]);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<PersoanaJuridicaFormValues>({
-    resolver: zodResolver(persoanaJuridicaSchema),
-    defaultValues: { stare: 'Activa', numar_angajati: 0, capital_social: 1 },
+  const { register, handleSubmit, reset, control, formState: { errors, isSubmitting } } = useForm<F>({
+    defaultValues: {
+      stare: "Activa", numar_angajati: 0, capital_social: 1,
+      adresa_puncte_de_lucru: [], coduri_caen_secundare: [],
+    },
   });
+
+  const { fields: puncteF, append: addPunct, remove: rmPunct } = useFieldArray({ control, name: "adresa_puncte_de_lucru" });
+  const { fields: caenF,   append: addCaen,  remove: rmCaen  } = useFieldArray({ control, name: "coduri_caen_secundare" });
 
   useEffect(() => {
     if (!isEdit) return;
-    const load = async () => {
-      try {
-        const data = await persoanaJuridicaApi.getById(id);
-        reset({
-          cod_fiscal: data.cod_fiscal,
-          denumire: data.denumire,
-          numar_de_inregistrare_in_registrul_comertului:
-            data.numar_de_inregistrare_in_registrul_comertului,
-          an_infiintare: data.an_infiintare,
-          adresa_sediu_social: data.adresa_sediu_social,
-          cod_postal: data.cod_postal ?? '',
-          iban: data.iban,
-          telefon: data.telefon ?? '',
-          email: data.email ?? '',
-          cod_caen_principal: data.cod_caen_principal,
-          numar_angajati: data.numar_angajati,
-          capital_social: data.capital_social,
-          stare: data.stare,
-          wallet: data.wallet ?? '',
-        });
-        setAdresePuncteLucru(data.adresa_puncte_de_lucru ?? []);
-        setCodurCaenSecundare(data.coduri_caen_secundare ?? []);
-      } catch {
-        toast('Eroare la încărcarea înregistrării', 'error');
-        navigate('/persoane-juridice');
-      }
-    };
-    load();
-  }, [id, isEdit, reset, toast, navigate]);
+    pjGetById(id!).then((r) => reset({
+      cod_fiscal: r.cod_fiscal,
+      denumire: r.denumire,
+      numar_de_inregistrare_in_registrul_comertului: r.numar_de_inregistrare_in_registrul_comertului,
+      an_infiintare: r.an_infiintare,
+      adresa_sediu_social: r.adresa_sediu_social,
+      cod_postal: r.cod_postal ?? "",
+      adresa_puncte_de_lucru: (r.adresa_puncte_de_lucru ?? []).map((v) => ({ v })),
+      iban: r.iban,
+      telefon: r.telefon ?? "",
+      email: r.email ?? "",
+      cod_caen_principal: r.cod_caen_principal,
+      coduri_caen_secundare: (r.coduri_caen_secundare ?? []).map((v) => ({ v })),
+      numar_angajati: r.numar_angajati,
+      capital_social: r.capital_social,
+      stare: r.stare,
+    })).catch(() => { toast("Eroare la încărcare.", "err"); navigate("/persoane-juridice"); });
+  }, [id, isEdit]);
 
-  const onSubmit = async (values: PersoanaJuridicaFormValues) => {
-    const payload = {
-      ...values,
-      adresa_puncte_de_lucru: adresePuncteLucru.filter(Boolean),
-      coduri_caen_secundare: codurCaenSecundare.filter(Boolean),
+  const onSubmit = async (v: F) => {
+    const body = {
+      ...v,
+      cod_postal: v.cod_postal || null,
+      telefon: v.telefon || null,
+      email: v.email || null,
+      adresa_puncte_de_lucru: v.adresa_puncte_de_lucru.map((x) => x.v).filter(Boolean),
+      coduri_caen_secundare: v.coduri_caen_secundare.map((x) => x.v).filter(Boolean),
     };
     try {
-      if (isEdit) {
-        await persoanaJuridicaApi.update(id, payload);
-        toast('Înregistrare actualizată cu succes', 'success');
-      } else {
-        await persoanaJuridicaApi.create(payload);
-        toast('Înregistrare creată cu succes', 'success');
-      }
-      navigate('/persoane-juridice');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Eroare la salvarea datelor';
-      toast(msg, 'error');
+      if (isEdit) { await pjUpdate(id!, body); toast("Actualizat.", "ok"); }
+      else { await pjCreate(body); toast("Creat.", "ok"); }
+      navigate("/persoane-juridice");
+    } catch (e: any) {
+      toast(e?.response?.data?.error ?? e?.response?.data ?? "Eroare la salvare.", "err");
     }
   };
 
-  const e = errors;
+  const DynList = ({ fields, onAdd, onRm, name, reg }: any) => (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <FieldLabel>{name}</FieldLabel>
+        <button type="button" onClick={onAdd}
+          className="text-xs font-mono" style={{ color: "var(--amber)" }}>+ adaugă</button>
+      </div>
+      <div className="space-y-2">
+        {fields.map((f: any, i: number) => (
+          <div key={f.id} className="flex gap-2">
+            <input {...reg(i)} className={inputCls()} />
+            <button type="button" onClick={() => onRm(i)}
+              className="text-xs font-mono px-2 flex-shrink-0" style={{ color: "var(--red)" }}>×</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
-    <AppLayout>
-      <div className="p-8 max-w-3xl">
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => navigate('/persoane-juridice')}
-            className="text-slate-400 hover:text-white transition-colors text-sm"
-          >
-            ← Înapoi
-          </button>
-          <div>
-            <h1 className="font-display text-2xl text-white">
-              {isEdit ? 'Editare Persoană Juridică' : 'Persoană Juridică Nouă'}
-            </h1>
-            {isReadOnly && (
-              <p className="text-xs text-warning mt-0.5">Vizualizare (mod auditor)</p>
-            )}
+    <div className="p-8 max-w-2xl mx-auto fade-up">
+      <BtnBack onClick={() => navigate("/persoane-juridice")} />
+      <h1 className="font-display text-3xl mb-6" style={{ color: "var(--text)" }}>
+        {isEdit ? "Editează persoană juridică" : "Persoană juridică nouă"}
+      </h1>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <Card title="Identificare">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <FieldLabel required>CIF</FieldLabel>
+              <input {...register("cod_fiscal", { required: "Obligatoriu" })} className={inputCls(!!errors.cod_fiscal)} placeholder="RO12345678" />
+              <FieldError msg={errors.cod_fiscal?.message} />
+            </div>
+            <div>
+              <FieldLabel required>Nr. Reg. Com.</FieldLabel>
+              <input {...register("numar_de_inregistrare_in_registrul_comertului", { required: "Obligatoriu" })}
+                className={inputCls(!!errors.numar_de_inregistrare_in_registrul_comertului)}
+                placeholder="J40/1234/2020" />
+              <FieldError msg={errors.numar_de_inregistrare_in_registrul_comertului?.message} />
+            </div>
           </div>
+          <div>
+            <FieldLabel required>Denumire</FieldLabel>
+            <input {...register("denumire", { required: "Obligatoriu" })} className={inputCls(!!errors.denumire)} />
+            <FieldError msg={errors.denumire?.message} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <FieldLabel required>An înființare</FieldLabel>
+              <input type="number" {...register("an_infiintare", { valueAsNumber: true, required: "Obligatoriu" })}
+                className={inputCls(!!errors.an_infiintare)} />
+              <FieldError msg={errors.an_infiintare?.message} />
+            </div>
+            <div>
+              <FieldLabel>Stare</FieldLabel>
+              <select {...register("stare")} className={inputCls()}>
+                <option value="Activa">Activă</option>
+                <option value="Radiata">Radiată</option>
+                <option value="Suspendata">Suspendată</option>
+                <option value="InInsolventa">În insolvență</option>
+              </select>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Adresă & contact">
+          <div>
+            <FieldLabel required>Adresă sediu social</FieldLabel>
+            <input {...register("adresa_sediu_social", { required: "Obligatoriu" })} className={inputCls(!!errors.adresa_sediu_social)} />
+            <FieldError msg={errors.adresa_sediu_social?.message} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <FieldLabel>Cod poștal</FieldLabel>
+              <input {...register("cod_postal")} className={inputCls()} maxLength={6} />
+            </div>
+            <div>
+              <FieldLabel>Telefon</FieldLabel>
+              <input {...register("telefon")} className={inputCls()} />
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Email</FieldLabel>
+            <input type="email" {...register("email")} className={inputCls(!!errors.email)} />
+            <FieldError msg={errors.email?.message} />
+          </div>
+          <div>
+            <FieldLabel required>IBAN</FieldLabel>
+            <input {...register("iban", { required: "Obligatoriu" })} className={inputCls(!!errors.iban)} placeholder="RO49AAAA1B31007593840000" />
+            <FieldError msg={errors.iban?.message} />
+          </div>
+          <DynList
+            fields={puncteF}
+            onAdd={() => addPunct({ v: "" })}
+            onRm={rmPunct}
+            name="Puncte de lucru"
+            reg={(i: number) => register(`adresa_puncte_de_lucru.${i}.v`)}
+          />
+        </Card>
+
+        <Card title="Activitate economică">
+          <div>
+            <FieldLabel required>Cod CAEN principal</FieldLabel>
+            <input {...register("cod_caen_principal", { required: "Obligatoriu" })} className={inputCls(!!errors.cod_caen_principal)} placeholder="6201" maxLength={4} />
+            <FieldError msg={errors.cod_caen_principal?.message} />
+          </div>
+          <DynList
+            fields={caenF}
+            onAdd={() => addCaen({ v: "" })}
+            onRm={rmCaen}
+            name="Coduri CAEN secundare"
+            reg={(i: number) => register(`coduri_caen_secundare.${i}.v`)}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <FieldLabel required>Nr. angajați</FieldLabel>
+              <input type="number" min={0} {...register("numar_angajati", { valueAsNumber: true })} className={inputCls()} />
+            </div>
+            <div>
+              <FieldLabel required>Capital social (RON)</FieldLabel>
+              <input type="number" step="0.01" min="1" {...register("capital_social", { valueAsNumber: true })} className={inputCls()} />
+            </div>
+          </div>
+        </Card>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <BtnGhost onClick={() => navigate("/persoane-juridice")}>Anulează</BtnGhost>
+          <BtnPrimary type="submit" loading={isSubmitting}>
+            {isEdit ? "Salvează" : "Creează"}
+          </BtnPrimary>
         </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Identificare */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Identificare
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cod Fiscal (CIF)" error={e.cod_fiscal?.message} required>
-                <input
-                  {...register('cod_fiscal')}
-                  className="input-field font-mono"
-                  placeholder="12345678"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field
-                label="Nr. Registrul Comerțului"
-                error={e.numar_de_inregistrare_in_registrul_comertului?.message}
-                required
-              >
-                <input
-                  {...register('numar_de_inregistrare_in_registrul_comertului')}
-                  className="input-field font-mono"
-                  placeholder="J40/123456/24"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-            </div>
-            <Field label="Denumire" error={e.denumire?.message} required>
-              <input
-                {...register('denumire')}
-                className="input-field"
-                placeholder="SC Exemplu SRL"
-                readOnly={isReadOnly}
-              />
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="An înființare" error={e.an_infiintare?.message} required>
-                <input
-                  {...register('an_infiintare', { valueAsNumber: true })}
-                  type="number"
-                  className="input-field"
-                  placeholder="2010"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Stare" error={e.stare?.message}>
-                <select {...register('stare')} className="input-field" disabled={isReadOnly}>
-                  <option value="Activa">Activă</option>
-                  <option value="Radiata">Radiată</option>
-                  <option value="Suspendata">Suspendată</option>
-                  <option value="InInsolventa">În Insolvență</option>
-                </select>
-              </Field>
-            </div>
-          </fieldset>
-
-          {/* Activitate */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Activitate
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cod CAEN principal" error={e.cod_caen_principal?.message} required>
-                <input
-                  {...register('cod_caen_principal')}
-                  className="input-field font-mono"
-                  placeholder="6201"
-                  maxLength={4}
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Nr. angajați" error={e.numar_angajati?.message} required>
-                <input
-                  {...register('numar_angajati', { valueAsNumber: true })}
-                  type="number"
-                  min={0}
-                  className="input-field"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Capital social (RON)" error={e.capital_social?.message} required>
-                <input
-                  {...register('capital_social', { valueAsNumber: true })}
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  className="input-field"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-            </div>
-            <ArrayField
-              label="Coduri CAEN secundare"
-              value={codurCaenSecundare}
-              onChange={setCodurCaenSecundare}
-              placeholder="6202"
-              readOnly={isReadOnly}
-            />
-          </fieldset>
-
-          {/* Contact & Adresă */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Contact & Adresă
-            </legend>
-            <Field label="Adresă sediu social" error={e.adresa_sediu_social?.message} required>
-              <input
-                {...register('adresa_sediu_social')}
-                className="input-field"
-                placeholder="Str. Exemplu, nr. 1, București"
-                readOnly={isReadOnly}
-              />
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cod poștal" error={e.cod_postal?.message}>
-                <input
-                  {...register('cod_postal')}
-                  className="input-field"
-                  placeholder="010101"
-                  maxLength={6}
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Telefon" error={e.telefon?.message}>
-                <input
-                  {...register('telefon')}
-                  className="input-field"
-                  placeholder="+40212345678"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Email" error={e.email?.message}>
-                <input
-                  {...register('email')}
-                  type="email"
-                  className="input-field"
-                  placeholder="contact@firma.ro"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-            </div>
-            <ArrayField
-              label="Adrese puncte de lucru"
-              value={adresePuncteLucru}
-              onChange={setAdresePuncteLucru}
-              placeholder="Str. Secundară, nr. 2, Cluj"
-              readOnly={isReadOnly}
-            />
-          </fieldset>
-
-          {/* Financiar */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Financiar & Web3
-            </legend>
-            <Field label="IBAN" error={e.iban?.message} required>
-              <input
-                {...register('iban')}
-                className="input-field font-mono"
-                placeholder="RO49AAAA1B31007593840000"
-                readOnly={isReadOnly}
-              />
-            </Field>
-            <Field label="Adresă Wallet" error={e.wallet?.message}>
-              <input
-                {...register('wallet')}
-                className="input-field font-mono text-xs"
-                placeholder="0x... (opțional)"
-                readOnly={isReadOnly}
-              />
-            </Field>
-          </fieldset>
-
-          {!isReadOnly && (
-            <div className="flex items-center gap-3">
-              <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
-                    Se salvează...
-                  </span>
-                ) : isEdit ? (
-                  'Salvează modificările'
-                ) : (
-                  'Creează înregistrarea'
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => navigate('/persoane-juridice')}
-              >
-                Anulează
-              </button>
-            </div>
-          )}
-        </form>
-      </div>
-    </AppLayout>
+      </form>
+    </div>
   );
 }

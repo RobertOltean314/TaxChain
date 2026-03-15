@@ -91,6 +91,10 @@
 -- ALTER TABLE users
 --     ALTER COLUMN assigned_wallet_key_enc DROP NOT NULL;
 
-UPDATE users
-SET role = 'Admin'
-WHERE email = 'olteanrobertadrian314@gmail.com'
+-- UPDATE users
+-- SET role = 'Admin'
+-- WHERE email = 'olteanrobertadrian314@gmail.com'
+
+-- UPDATE users
+-- SET persoana_juridica_id = '85cbd573-36df-49bc-9b40-92e4197af598'
+-- WHERE id = '00f31f8c-69e0-40be-95f0-59fcc396568a';

@@ -268,13 +268,16 @@
 -- CREATE INDEX idx_factura_linie_factura_id ON factura_linie(factura_id);
 
 
-SELECT typname FROM pg_type WHERE typtype = 'e' ORDER BY typname;
+-- SELECT typname FROM pg_type WHERE typtype = 'e' ORDER BY typname;
 
-SELECT table_name FROM information_schema.tables
-    WHERE table_schema = 'public'
-    ORDER BY table_name;
+-- SELECT table_name FROM information_schema.tables
+--     WHERE table_schema = 'public'
+--     ORDER BY table_name;
 
-SELECT column_name, data_type, is_nullable
-    FROM information_schema.columns
-    WHERE table_name = 'factura'
-    ORDER BY ordinal_position;
+-- SELECT column_name, data_type, is_nullable
+--     FROM information_schema.columns
+--     WHERE table_name = 'factura'
+--     ORDER BY ordinal_position;
+
+-- ALTER TABLE partener
+-- RENAME COLUMN numar_reg_com TO numar_in_registrul_comertului;

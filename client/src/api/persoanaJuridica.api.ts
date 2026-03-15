@@ -1,42 +1,8 @@
-import api from './axios';
-import type { PersoanaJuridica } from '../types';
-import type { PersoanaJuridicaFormValues } from '../validation/schemas';
+import api from "./axios";
+import type { PersoanaJuridica } from "../types";
 
-export const persoanaJuridicaApi = {
-  getAll: async (): Promise<PersoanaJuridica[]> => {
-    const { data } = await api.get<PersoanaJuridica[]>('/persoana-juridica');
-    return data;
-  },
-
-  getById: async (id: string): Promise<PersoanaJuridica> => {
-    const { data } = await api.get<PersoanaJuridica>(
-      `/persoana-juridica/${id}`
-    );
-    return data;
-  },
-
-  create: async (
-    payload: PersoanaJuridicaFormValues
-  ): Promise<PersoanaJuridica> => {
-    const { data } = await api.post<PersoanaJuridica>(
-      '/persoana-juridica',
-      payload
-    );
-    return data;
-  },
-
-  update: async (
-    id: string,
-    payload: PersoanaJuridicaFormValues
-  ): Promise<PersoanaJuridica> => {
-    const { data } = await api.put<PersoanaJuridica>(
-      `/persoana-juridica/${id}`,
-      payload
-    );
-    return data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await api.delete(`/persoana-juridica/${id}`);
-  },
-};
+export const pjGetAll    = async (): Promise<PersoanaJuridica[]> => (await api.get("/persoana-juridica")).data;
+export const pjGetById   = async (id: string): Promise<PersoanaJuridica> => (await api.get(`/persoana-juridica/${id}`)).data;
+export const pjCreate    = async (body: unknown): Promise<PersoanaJuridica> => (await api.post("/persoana-juridica", body)).data;
+export const pjUpdate    = async (id: string, body: unknown): Promise<PersoanaJuridica> => (await api.put(`/persoana-juridica/${id}`, body)).data;
+export const pjDelete    = async (id: string): Promise<void> => { await api.delete(`/persoana-juridica/${id}`); };

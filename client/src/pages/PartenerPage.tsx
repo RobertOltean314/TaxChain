@@ -1,26 +1,27 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
-import { pjGetAll, pjDelete } from "../api/persoanaJuridica.api";
+import { partenerGetAll, partenerDelete } from "../api/partener.api";
 import { Confirm } from "../components/ui/Confirm";
 import { useToast } from "../components/ui/Toast";
 import { Spinner, Empty, PageHeader, BtnPrimary, THead, TRow, TD, Dash, Badge } from "../components/ui/ui";
-import type { PersoanaJuridica } from "../types";
+import type { Partner } from "../types";
+import { PARTNER_TIP_LABELS, PARTNER_ENTITY_LABELS } from "../types";
 
-export default function PersoanaJuridicaPage() {
+export default function PartenerPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [rows, setRows] = useState<PersoanaJuridica[]>([]);
-  const [filtered, setFiltered] = useState<PersoanaJuridica[]>([]);
+  const [rows, setRows] = useState<Partner[]>([]);
+  const [filtered, setFiltered] = useState<Partner[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
-  const [del, setDel] = useState<PersoanaJuridica | null>(null);
+  const [del, setDel] = useState<Partner | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const isAdmin = user?.role === "Admin";
+  const canWrite = user?.role === "Admin" || user?.role === "Taxpayer";
 
   useEffect(() => {
-    pjGetAll()
+    partenerGetAll()
       .then((d) => { setRows(d); setFiltered(d); })
       .catch(() => toast("Eroare la încărcare.", "err"))
       .finally(() => setLoading(false));
@@ -29,9 +30,10 @@ export default function PersoanaJuridicaPage() {
   useEffect(() => {
     const s = q.toLowerCase();
     setFiltered(rows.filter((r) =>
-      r.cod_fiscal.toLowerCase().includes(s) ||
       r.denumire.toLowerCase().includes(s) ||
-      (r.email ?? "").toLowerCase().includes(s),
+      (r.cod_fiscal ?? "").toLowerCase().includes(s) ||
+      (r.email ?? "").toLowerCase().includes(s) ||
+      (r.oras ?? "").toLowerCase().includes(s),
     ));
   }, [q, rows]);
 
@@ -39,8 +41,8 @@ export default function PersoanaJuridicaPage() {
     if (!del) return;
     setDeleting(true);
     try {
-      await pjDelete(del.id);
-      toast("Șters.", "ok");
+      await partenerDelete(del.id);
+      toast("Partener șters.", "ok");
       setRows((p) => p.filter((r) => r.id !== del.id));
     } catch { toast("Eroare la ștergere.", "err"); }
     finally { setDeleting(false); setDel(null); }
@@ -49,16 +51,16 @@ export default function PersoanaJuridicaPage() {
   return (
     <div className="p-8 fade-up">
       <PageHeader
-        title="Persoane Juridice"
+        title="Parteneri"
         sub={`${filtered.length} înregistrări`}
-        action={isAdmin ? (
-          <BtnPrimary onClick={() => navigate("/persoane-juridice/new")}>+ Adaugă</BtnPrimary>
+        action={canWrite ? (
+          <BtnPrimary onClick={() => navigate("/parteneri/nou")}>+ Partener nou</BtnPrimary>
         ) : undefined}
       />
 
       <input
         value={q} onChange={(e) => setQ(e.target.value)}
-        placeholder="Caută după CIF, denumire sau email…"
+        placeholder="Caută după denumire, CIF, email, oraș…"
         className="mb-5 w-72 rounded-lg px-3 py-2 text-sm font-mono border outline-none transition-colors"
         style={{ background: "var(--bg-card)", borderColor: "var(--border)", color: "var(--text)" }}
         onFocus={(e) => (e.target.style.borderColor = "var(--amber)")}
@@ -66,23 +68,28 @@ export default function PersoanaJuridicaPage() {
       />
 
       {loading ? <Spinner /> : filtered.length === 0 ? (
-        <Empty msg={q ? "Niciun rezultat." : "Nicio persoană juridică înregistrată."} />
+        <Empty msg={q ? "Niciun rezultat." : "Niciun partener înregistrat."} />
       ) : (
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--border)" }}>
           <table className="min-w-full" style={{ background: "var(--bg-card)" }}>
-            <THead cols={["CIF", "Denumire", "Email", "Stare", "Angajați", ...(isAdmin ? ["Acțiuni"] : [])]} />
+            <THead cols={["Denumire", "CIF", "Tip", "Entitate", "Oraș", "Email", ...(canWrite ? ["Acțiuni"] : [])]} />
             <tbody>
               {filtered.map((r) => (
-                <TRow key={r.id} onClick={() => navigate(`/persoane-juridice/${r.id}`)}>
-                  <TD mono>{r.cod_fiscal}</TD>
+                <TRow key={r.id} onClick={() => navigate(`/parteneri/${r.id}`)}>
                   <TD><span className="font-medium">{r.denumire}</span></TD>
+                  <TD mono>{r.cod_fiscal ?? <Dash />}</TD>
+                  <TD><Badge value={r.tip} variant="partner" /></TD>
+                  <TD>
+                    <span className="text-xs font-mono" style={{ color: "var(--text-sub)" }}>
+                      {PARTNER_ENTITY_LABELS[r.tip_entitate]}
+                    </span>
+                  </TD>
+                  <TD>{r.oras ?? <Dash />}</TD>
                   <TD>{r.email ?? <Dash />}</TD>
-                  <TD><Badge value={r.stare} variant="pj" /></TD>
-                  <TD mono>{r.numar_angajati}</TD>
-                  {isAdmin && (
+                  {canWrite && (
                     <TD>
                       <div className="flex justify-end gap-3" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => navigate(`/persoane-juridice/${r.id}`)}
+                        <button onClick={() => navigate(`/parteneri/${r.id}`)}
                           className="text-xs font-mono" style={{ color: "var(--amber)" }}>editează</button>
                         <button onClick={() => setDel(r)}
                           className="text-xs font-mono" style={{ color: "var(--red)" }}>șterge</button>
@@ -97,7 +104,7 @@ export default function PersoanaJuridicaPage() {
       )}
 
       <Confirm
-        open={!!del} title="Șterge persoană juridică"
+        open={!!del} title="Șterge partener"
         body={`Ștergi definitiv "${del?.denumire}"?`}
         ok="Șterge" loading={deleting}
         onOk={doDelete} onCancel={() => setDel(null)}

@@ -1,81 +1,62 @@
-import {
-  createContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from 'react';
-import { authApi } from '../api/auth.api';
-import { setAccessToken } from '../api/axios';
-import type { UserResponse, AuthTokens } from '../types';
+import { createContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { loginGoogle, walletNonce, walletVerify, logoutApi, refreshTokens } from "../api/auth.api";
+import type { UserResponse, AuthTokens } from "../types";
 
-interface AuthContextValue {
+interface Ctx {
   user: UserResponse | null;
   isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (tokens: AuthTokens) => void;
-  logout: () => Promise<void>;
+  doLoginGoogle: (idToken: string) => Promise<void>;
+  doLoginWallet: (address: string, sign: (msg: string) => Promise<string>) => Promise<void>;
+  doLogout: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<Ctx>({} as Ctx);
+
+function store(tokens: AuthTokens, setUser: (u: UserResponse) => void) {
+  (window as any).__tc_token = tokens.access_token;
+  localStorage.setItem("tc_rt", tokens.refresh_token);
+  setUser(tokens.user);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser]       = useState<UserResponse | null>(null);
+  const [isLoading, setLoad]  = useState(true);
 
-  // On mount: try to restore session from stored refresh token
+  // Restore session on mount
   useEffect(() => {
-    const restore = async () => {
-      const storedRefresh = localStorage.getItem('refresh_token');
-      if (!storedRefresh) {
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const tokens = await authApi.refresh(storedRefresh);
-        setAccessToken(tokens.access_token);
-        localStorage.setItem('refresh_token', tokens.refresh_token);
-        setUser(tokens.user);
-      } catch {
-        localStorage.removeItem('refresh_token');
-        setAccessToken(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    restore();
+    const rt = localStorage.getItem("tc_rt");
+    if (!rt) { setLoad(false); return; }
+    refreshTokens(rt)
+      .then((t) => store(t, setUser))
+      .catch(() => localStorage.removeItem("tc_rt"))
+      .finally(() => setLoad(false));
   }, []);
 
-  const login = useCallback((tokens: AuthTokens) => {
-    setAccessToken(tokens.access_token);
-    localStorage.setItem('refresh_token', tokens.refresh_token);
-    setUser(tokens.user);
+  const doLoginGoogle = useCallback(async (idToken: string) => {
+    const t = await loginGoogle(idToken);
+    store(t, setUser);
   }, []);
 
-  const logout = useCallback(async () => {
-    const storedRefresh = localStorage.getItem('refresh_token');
-    if (storedRefresh) {
-      try {
-        await authApi.logout(storedRefresh);
-      } catch {
-        // ignore — we clear locally regardless
-      }
-    }
-    setAccessToken(null);
-    localStorage.removeItem('refresh_token');
+  const doLoginWallet = useCallback(async (
+    address: string,
+    sign: (msg: string) => Promise<string>,
+  ) => {
+    const nonce = await walletNonce(address);
+    const sig   = await sign(nonce);
+    const t     = await walletVerify(address, sig);
+    store(t, setUser);
+  }, []);
+
+  const doLogout = useCallback(async () => {
+    const rt = localStorage.getItem("tc_rt");
+    if (rt) { try { await logoutApi(rt); } catch { /* ignore */ } }
+    (window as any).__tc_token = null;
+    localStorage.removeItem("tc_rt");
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isLoading, doLoginGoogle, doLoginWallet, doLogout }}>
       {children}
     </AuthContext.Provider>
   );
