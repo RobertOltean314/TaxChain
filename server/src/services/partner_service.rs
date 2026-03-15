@@ -7,10 +7,6 @@ use uuid::Uuid;
 
 use crate::models::partner_model::{EntityType, Partner, PartnerType};
 
-// ============================================================================
-// SQL CONSTANTS
-// ============================================================================
-
 const SELECT_COLS: &str = "
     SELECT id, denumire, cod_fiscal, numar_reg_com,
            tip::text AS tip,
@@ -64,10 +60,6 @@ const UPDATE_QUERY: &str = "
 ";
 
 const DELETE_QUERY: &str = "DELETE FROM partener WHERE id=$1 AND created_by=$2";
-
-// ============================================================================
-// ROW TYPE
-// ============================================================================
 
 #[derive(sqlx::FromRow)]
 struct PartnerRow {
@@ -144,10 +136,6 @@ fn tip_entitate_str(t: EntityType) -> &'static str {
     }
 }
 
-// ============================================================================
-// REPOSITORY TRAIT
-// ============================================================================
-
 #[async_trait]
 pub trait PartnerRepository: Send + Sync {
     async fn find_all_for_user(&self, user_id: Uuid) -> Result<Vec<Partner>, sqlx::Error>;
@@ -163,10 +151,6 @@ pub trait PartnerRepository: Send + Sync {
 }
 
 pub type DynPartnerRepository = Arc<dyn PartnerRepository>;
-
-// ============================================================================
-// POSTGRES IMPLEMENTATION
-// ============================================================================
 
 pub struct PgPartnerRepository {
     pool: PgPool,
