@@ -320,16 +320,16 @@ WHERE data_incetare IS NULL OR data_incetare > data_numire;
 -- VERIFICATION QUERIES
 -- ============================================================================
 
-SELECT COUNT(*) AS "Total persoana_fizica" FROM persoana_fizica;
-SELECT COUNT(*) AS "Total persoana_juridica" FROM persoana_juridica;
-SELECT COUNT(*) AS "Total reprezentanti" FROM reprezentanti_persoana_juridica;
+-- SELECT COUNT(*) AS "Total persoana_fizica" FROM persoana_fizica;
+-- SELECT COUNT(*) AS "Total persoana_juridica" FROM persoana_juridica;
+-- SELECT COUNT(*) AS "Total reprezentanti" FROM reprezentanti_persoana_juridica;
 
--- Display sample data from each table
-SELECT 'Sample data from persoana_fizica' AS section;
-SELECT id, cnp, nume, prenume, email, stare, sex FROM persoana_fizica LIMIT 5;
+-- -- Display sample data from each table
+-- SELECT 'Sample data from persoana_fizica' AS section;
+-- SELECT id, cnp, nume, prenume, email, stare, sex FROM persoana_fizica LIMIT 5;
 
-SELECT 'Sample data from persoana_juridica' AS section;
-SELECT id, cod_fiscal, denumire, numar_angajati, capital_social, stare FROM persoana_juridica LIMIT 5;
+-- SELECT 'Sample data from persoana_juridica' AS section;
+-- SELECT id, cod_fiscal, denumire, numar_angajati, capital_social, stare FROM persoana_juridica LIMIT 5;
 
-SELECT 'Sample data from reprezentanti_persoana_juridica' AS section;
-SELECT id, persoana_juridica_id, persoana_fizica_id, functie, data_numire FROM reprezentanti_persoana_juridica LIMIT 5;
+-- SELECT 'Sample data from reprezentanti_persoana_juridica' AS section;
+-- SELECT id, persoana_juridica_id, persoana_fizica_id, functie, data_numire FROM reprezentanti_persoana_juridica LIMIT 5;

@@ -10,6 +10,7 @@
 *.swo
 *~
 .DS_Store
+docs
 
 # Client (Node.js/JavaScript/TypeScript)
 /client/node_modules/
