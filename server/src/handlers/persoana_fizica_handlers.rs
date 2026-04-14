@@ -68,24 +68,69 @@ pub async fn get_persoana_fizica_by_id(
 }
 
 /// POST /persoana-fizica — creates a new record.
+/// Admin: can create for anyone.
+/// Taxpayer: can create their own during onboarding (only if they don't have one yet).
 #[post("")]
 pub async fn create_persoana_fizica(
     req: HttpRequest,
     repo: web::Data<DynPersoanaFizicaRepository>,
+    user_repo: web::Data<crate::services::user_service::DynUserRepository>,
     body: web::Json<PersoanaFizicaRequest>,
 ) -> impl Responder {
-    if let Err(resp) = require_role(&req, &[UserRole::Admin]) {
-        return resp;
+    let user = match require_role(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
+    // Taxpayer can only create their own PersoanaFizica during onboarding
+    if user.claims().role == UserRole::Taxpayer {
+        if let Some(_) = user.claims().persoana_fizica_id {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "You already have a PersoanaFizica record. Contact an administrator to modify it."
+            }));
+        }
     }
 
     if let Err(errors) = body.validate() {
-        return HttpResponse::UnprocessableEntity().body(errors.to_string());
+        eprintln!("Validation errors: {:?}", errors);
+        let error_messages: Vec<String> = errors
+            .field_errors()
+            .iter()
+            .flat_map(|(field, errs)| {
+                errs.iter().map(move |err| {
+                    format!(
+                        "{}: {}",
+                        field,
+                        err.message.as_deref().unwrap_or("validation failed")
+                    )
+                })
+            })
+            .collect();
+        return HttpResponse::UnprocessableEntity().json(json!({
+            "error": "Validation failed",
+            "details": error_messages
+        }));
     }
 
     let persoana = PersoanaFizica::from_request(body.into_inner());
 
-    match repo.create(persoana).await {
-        Ok(created) => HttpResponse::Created().json(created),
+    match repo.create(persoana.clone()).await {
+        Ok(created) => {
+            // If a Taxpayer created this, automatically link it to their account
+            if user.claims().role == UserRole::Taxpayer {
+                if let Ok(user_id) = Uuid::parse_str(&user.claims().sub) {
+                    let _ = user_repo
+                        .update_entity_links(
+                            user_id,
+                            Some(created.id),
+                            user.claims().persoana_juridica_id, // Preserve existing juridica ID
+                        )
+                        .await;
+                }
+            }
+
+            HttpResponse::Created().json(created)
+        }
         Err(e) => {
             eprintln!("create error: {e}");
             let error_body = json!({"error": "We failed to create the Persoana Fizica Entity. Please review the details", "details": e.to_string()});

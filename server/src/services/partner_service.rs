@@ -8,8 +8,9 @@ use uuid::Uuid;
 use crate::models::partner_model::{EntityType, Partner, PartnerType};
 
 const SELECT_COLS: &str = "
-    SELECT id, denumire, cod_fiscal, numar_in_registrul_comertului,
-           tip::text AS tip,
+    SELECT id, denumire, cod_fiscal,
+           numar_in_registrul_comertului,
+           tip::text     AS tip,
            tip_entitate::text AS tip_entitate,
            adresa, cod_postal, oras, tara,
            email, telefon, iban,
@@ -32,8 +33,9 @@ const CREATE_QUERY: &str = "
             $11,$12,$13,
             $14,$15,
             $16,$17,$18)
-    RETURNING id, denumire, cod_fiscal, numar_in_registrul_comertului,
-              tip::text AS tip,
+    RETURNING id, denumire, cod_fiscal,
+              numar_in_registrul_comertului,
+              tip::text     AS tip,
               tip_entitate::text AS tip_entitate,
               adresa, cod_postal, oras, tara,
               email, telefon, iban,
@@ -50,8 +52,9 @@ const UPDATE_QUERY: &str = "
         persoana_fizica_id=$13, persoana_juridica_id=$14,
         updated_at=$15
     WHERE id=$16 AND created_by=$17
-    RETURNING id, denumire, cod_fiscal, numar_in_registrul_comertului,
-              tip::text AS tip,
+    RETURNING id, denumire, cod_fiscal,
+              numar_in_registrul_comertului,
+              tip::text     AS tip,
               tip_entitate::text AS tip_entitate,
               adresa, cod_postal, oras, tara,
               email, telefon, iban,

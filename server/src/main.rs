@@ -8,15 +8,15 @@ use taxchain::{
     auth::middleware::JwtAuthMiddleware,
     handlers::{
         auth_handlers::{
-            AuthConfig, google_login_handler, logout, refresh_token_handler, wallet_nonce_handler,
-            wallet_verify_handler,
+            AuthConfig, google_login_handler, link_entity_handler, logout, refresh_token_handler,
+            wallet_nonce_handler, wallet_verify_handler,
         },
         create_persoana_fizica, create_persoana_juridica, delete_persoana_fizica,
         delete_persoana_juridica, find_all_persoana_fizica, find_all_persoana_juridica,
         get_persoana_fizica_by_id,
         invoice_handlers::{
-            create_invoice, delete_invoice, find_all_invoices, get_invoice_by_id, update_invoice,
-            update_invoice_payment, update_invoice_status,
+            create_invoice, delete_invoice, find_all_invoices, get_invoice_by_id,
+            get_next_invoice_number, update_invoice, update_invoice_payment, update_invoice_status,
         },
         partner_handlers::{
             create_partener, delete_partener, find_all_partener, get_partener_by_id,
@@ -83,14 +83,22 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(http_client.clone()))
             .app_data(web::Data::new(partener_repo.clone()))
             .app_data(web::Data::new(invoice_repo.clone()))
+            // ── Auth (public) ──────────────────────────────────────────────
             .service(
                 web::scope("/auth")
                     .service(google_login_handler)
                     .service(wallet_nonce_handler)
                     .service(wallet_verify_handler)
                     .service(refresh_token_handler)
-                    .service(logout),
+                    .service(logout)
+                    // JWT-protected: user must be logged in to link an entity
+                    .service(
+                        web::scope("")
+                            .wrap(JwtAuthMiddleware)
+                            .service(link_entity_handler),
+                    ),
             )
+            // ── Persoana Fizica ────────────────────────────────────────────
             .service(
                 web::scope("/persoana-fizica")
                     .wrap(JwtAuthMiddleware)
@@ -100,6 +108,7 @@ async fn main() -> std::io::Result<()> {
                     .service(update_persoana_fizica)
                     .service(delete_persoana_fizica),
             )
+            // ── Persoana Juridica ──────────────────────────────────────────
             .service(
                 web::scope("/persoana-juridica")
                     .wrap(JwtAuthMiddleware)
@@ -109,6 +118,7 @@ async fn main() -> std::io::Result<()> {
                     .service(update_persoana_juridica)
                     .service(delete_persoana_juridica),
             )
+            // ── Partener (Romanian spelling — consistent with DB table name)
             .service(
                 web::scope("/partener")
                     .wrap(JwtAuthMiddleware)
@@ -118,9 +128,11 @@ async fn main() -> std::io::Result<()> {
                     .service(update_partener)
                     .service(delete_partener),
             )
+            // ── Factura ────────────────────────────────────────────────────
             .service(
-                web::scope("/invoice")
+                web::scope("/factura")
                     .wrap(JwtAuthMiddleware)
+                    .service(get_next_invoice_number) // GET /factura/next-number — must be before /{id}
                     .service(find_all_invoices)
                     .service(get_invoice_by_id)
                     .service(create_invoice)
@@ -130,7 +142,7 @@ async fn main() -> std::io::Result<()> {
                     .service(delete_invoice),
             )
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }

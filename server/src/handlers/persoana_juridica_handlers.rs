@@ -70,10 +70,21 @@ pub async fn get_persoana_juridica_by_id(
 pub async fn create_persoana_juridica(
     req: HttpRequest,
     repo: web::Data<DynPersoanaJuridicaRepository>,
+    user_repo: web::Data<crate::services::user_service::DynUserRepository>,
     body: web::Json<PersoanaJuridicaRequest>,
 ) -> impl Responder {
-    if let Err(resp) = require_role(&req, &[UserRole::Admin]) {
-        return resp;
+    let user = match require_role(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
+    // Taxpayer can only create their own PersoanaJuridica during onboarding
+    if user.claims().role == UserRole::Taxpayer {
+        if let Some(_) = user.claims().persoana_juridica_id {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "You already have a PersoanaJuridica record. Contact an administrator to modify it."
+            }));
+        }
     }
 
     if let Err(errors) = body.validate() {
@@ -82,8 +93,23 @@ pub async fn create_persoana_juridica(
 
     let persoana = PersoanaJuridica::from_request(body.into_inner());
 
-    match repo.create(persoana).await {
-        Ok(created) => HttpResponse::Created().json(created),
+    match repo.create(persoana.clone()).await {
+        Ok(created) => {
+            // If a Taxpayer created this, automatically link it to their account
+            if user.claims().role == UserRole::Taxpayer {
+                if let Ok(user_id) = Uuid::parse_str(&user.claims().sub) {
+                    let _ = user_repo
+                        .update_entity_links(
+                            user_id,
+                            user.claims().persoana_fizica_id, // Preserve existing fizica ID
+                            Some(created.id),
+                        )
+                        .await;
+                }
+            }
+
+            HttpResponse::Created().json(created)
+        }
         Err(e) => {
             let error_body = json!({"error": "We failed to create the Persoana Juridica Entity. Please review the details", "details": e.to_string()});
             HttpResponse::InternalServerError().json(error_body)

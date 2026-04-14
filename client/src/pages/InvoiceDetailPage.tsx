@@ -1,293 +1,402 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { invoiceGetById, invoiceSetStatus, invoiceSetPayment, invoiceDelete } from "../api/invoice.api";
-import { partenerGetById } from "../api/partener.api";
-import { Confirm } from "../components/ui/Confirm";
+import { invoiceApi } from "../api/invoice.api";
+import { partnerApi } from "../api/partner.api";
+import { AppLayout } from "../components/ui/AppLayout";
 import { useToast } from "../components/ui/Toast";
 import { useAuth } from "../auth/useAuth";
-import { Spinner, BtnBack, Badge, fmtNum, fmtDate } from "../components/ui/ui";
 import type { Invoice, InvoiceLine, InvoiceStatus, Partner } from "../types";
-import { DOC_TYPE_LABELS, STATUS_LABELS, VAT_LABELS, NEXT_STATUSES } from "../types";
 
-// Colour per next-status button
-const NEXT_COLORS: Record<InvoiceStatus, string> = {
-  Draft:     "var(--text-sub)",
-  Issued:    "var(--blue)",
-  Sent:      "var(--violet)",
-  Paid:      "var(--green)",
-  Cancelled: "var(--red)",
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<InvoiceStatus, string> = {
+  Draft: "Ciornă",
+  Issued: "Emisă",
+  Sent: "Trimisă",
+  Paid: "Plătită",
+  Cancelled: "Anulată",
 };
 
-export default function InvoiceDetailPage() {
-  const navigate = useNavigate();
+const STATUS_CLASSES: Record<InvoiceStatus, string> = {
+  Draft: "badge bg-slate-700/50 text-slate-400",
+  Issued: "badge bg-brand/15 text-brand",
+  Sent: "badge bg-accent/15 text-accent",
+  Paid: "badge badge-activ",
+  Cancelled: "badge badge-radiata",
+};
+
+// Valid forward transitions shown as action buttons
+const TRANSITIONS: Partial<
+  Record<InvoiceStatus, { next: InvoiceStatus; label: string }>
+> = {
+  Draft: { next: "Issued", label: "Emite factura" },
+  Issued: { next: "Sent", label: "Marchează trimisă" },
+  Sent: { next: "Paid", label: "Marchează plătită" },
+};
+
+function formatRON(amount: string) {
+  const n = parseFloat(amount);
+  if (isNaN(n)) return "—";
+  return new Intl.NumberFormat("ro-RO", {
+    style: "currency",
+    currency: "RON",
+  }).format(n);
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isReadOnly = user?.role === "Auditor";
+  const canEdit = user?.role !== "Auditor";
 
-  const [invoice, setInvoice]     = useState<Invoice | null>(null);
-  const [lines, setLines]         = useState<InvoiceLine[]>([]);
-  const [partner, setPartner]     = useState<Partner | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [lines, setLines] = useState<InvoiceLine[]>([]);
+  const [partner, setPartner] = useState<Partner | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [payAmt, setPayAmt]         = useState("");
-  const [savingPay, setSavingPay]   = useState(false);
-  const [nextTarget, setNextTarget] = useState<InvoiceStatus | null>(null);
-  const [transiting, setTransiting] = useState(false);
-  const [showDel, setShowDel]       = useState(false);
-  const [deleting, setDeleting]     = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
+  const [isAdvancingStatus, setIsAdvancingStatus] = useState(false);
 
-  const canWrite = user?.role === "Admin" || user?.role === "Taxpayer";
+  const load = async () => {
+    if (!id) return;
+    try {
+      const { invoice: inv, lines: invLines } = await invoiceApi.getById(id);
+      setInvoice(inv);
+      setLines(invLines);
+      try {
+        const p = await partnerApi.getById(inv.partner_id);
+        setPartner(p);
+      } catch {
+        // Non-fatal — partner name falls back to ID
+      }
+    } catch {
+      toast("Eroare la încărcarea facturii");
+      navigate("/invoices");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!id) return;
-    invoiceGetById(id)
-      .then(({ invoice: inv, lines: ln }) => {
-        setInvoice(inv);
-        setLines(ln);
-        if (inv.partner_id) {
-          partenerGetById(inv.partner_id).then(setPartner).catch(() => {});
-        }
-      })
-      .catch(() => { toast("Eroare la încărcare.", "err"); navigate("/facturi"); })
-      .finally(() => setLoading(false));
+    load();
   }, [id]);
 
-  // Status transition
-  const doTransition = async () => {
-    if (!invoice || !nextTarget) return;
-    setTransiting(true);
-    try {
-      const updated = await invoiceSetStatus(invoice.id, { status: nextTarget });
-      setInvoice(updated);
-      toast(`Stare → ${STATUS_LABELS[nextTarget]}`, "ok");
-    } catch (e: any) {
-      toast(e?.response?.data?.error ?? "Eroare la actualizarea stării.", "err");
-    } finally { setTransiting(false); setNextTarget(null); }
-  };
-
-  // Payment — body must be { amount: number } per InvoicePaymentRequest in Rust
-  const doPayment = async () => {
+  const handleAdvanceStatus = async (nextStatus: InvoiceStatus) => {
     if (!invoice) return;
-    const amount = parseFloat(payAmt);
-    if (isNaN(amount) || amount <= 0) { toast("Sumă invalidă.", "err"); return; }
-    setSavingPay(true);
+    setIsAdvancingStatus(true);
     try {
-      const updated = await invoiceSetPayment(invoice.id, { amount });
+      const updated = await invoiceApi.updateStatus(invoice.id, nextStatus);
       setInvoice(updated);
-      setPayAmt("");
-      toast("Plată înregistrată.", "ok");
-    } catch (e: any) {
-      toast(e?.response?.data?.error ?? "Eroare la înregistrarea plății.", "err");
-    } finally { setSavingPay(false); }
+      toast(`Starea facturii actualizată: ${STATUS_LABELS[nextStatus]}`);
+    } catch {
+      toast("Eroare la actualizarea stării");
+    } finally {
+      setIsAdvancingStatus(false);
+    }
   };
 
-  // Delete
-  const doDelete = async () => {
+  const handleCancelInvoice = async () => {
     if (!invoice) return;
-    setDeleting(true);
+    setIsAdvancingStatus(true);
     try {
-      await invoiceDelete(invoice.id);
-      toast("Factură ștearsă.", "ok");
-      navigate("/facturi");
-    } catch (e: any) {
-      toast(e?.response?.data?.error ?? "Eroare la ștergere.", "err");
-    } finally { setDeleting(false); setShowDel(false); }
+      const updated = await invoiceApi.updateStatus(invoice.id, "Cancelled");
+      setInvoice(updated);
+      toast("Factura a fost anulată");
+    } catch {
+      toast("Eroare la anulare");
+    } finally {
+      setIsAdvancingStatus(false);
+    }
   };
 
-  if (loading) return <div className="p-8"><Spinner /></div>;
-  if (!invoice) return null;
+  const handleRecordPayment = async () => {
+    if (!invoice || !paymentAmount) return;
+    setIsRecordingPayment(true);
+    try {
+      const updated = await invoiceApi.recordPayment(invoice.id, paymentAmount);
+      setInvoice(updated);
+      setPaymentAmount("");
+      toast("Plată înregistrată");
+    } catch {
+      toast("Eroare la înregistrarea plății");
+    } finally {
+      setIsRecordingPayment(false);
+    }
+  };
 
-  const numStr = `${invoice.series ? invoice.series + "-" : ""}${invoice.number}`;
-  const nextStatuses = NEXT_STATUSES[invoice.status];
-  const canPayment = canWrite &&
-    invoice.status !== "Draft" &&
-    invoice.status !== "Cancelled" &&
-    invoice.amount_due > 0;
+  if (isLoading || !invoice) {
+    return (
+      <AppLayout>
+        <div className="p-8 flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const transition = TRANSITIONS[invoice.status];
+  const canCancel =
+    canEdit && invoice.status !== "Paid" && invoice.status !== "Cancelled";
+  const canRecordPayment =
+    canEdit &&
+    (invoice.status === "Issued" || invoice.status === "Sent") &&
+    parseFloat(invoice.amount_due) > 0;
 
   return (
-    <div className="p-8 max-w-4xl mx-auto fade-up">
-      <BtnBack onClick={() => navigate("/facturi")} />
-
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="font-display text-3xl" style={{ color: "var(--text)" }}>{numStr}</h1>
-            <Badge value={invoice.status} variant="invoice" />
+    <AppLayout>
+      <div className="p-8 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/invoices")}
+              className="text-slate-400 hover:text-white transition-colors text-sm"
+            >
+              ← Înapoi
+            </button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="font-display text-2xl text-white">
+                  {invoice.number}
+                </h1>
+                <span className={STATUS_CLASSES[invoice.status]}>
+                  {STATUS_LABELS[invoice.status]}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Emisă: {invoice.issued_date}
+                {invoice.due_date && ` · Scadentă: ${invoice.due_date}`}
+              </p>
+            </div>
           </div>
-          <p className="text-xs font-mono" style={{ color: "var(--text-dim)" }}>
-            {DOC_TYPE_LABELS[invoice.document_type]} · emis {fmtDate(invoice.issued_date)}
-          </p>
-        </div>
-        {canWrite && invoice.status === "Draft" && (
-          <div className="flex gap-2 flex-shrink-0">
-            <button onClick={() => navigate(`/facturi/${invoice.id}/editare`)}
-              className="px-3 py-1.5 text-xs font-mono rounded-lg border transition-colors"
-              style={{ color: "var(--amber)", background: "var(--amber-bg)", borderColor: "var(--amber-dim)" }}>
+
+          {canEdit && invoice.status === "Draft" && (
+            <button
+              onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
+              className="btn-secondary"
+            >
               Editează
             </button>
-            <button onClick={() => setShowDel(true)}
-              className="px-3 py-1.5 text-xs font-mono rounded-lg border transition-colors"
-              style={{ color: "var(--red)", background: "var(--red-bg)", borderColor: "var(--red)" }}>
-              Șterge
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Lifecycle ── */}
-      {canWrite && nextStatuses.length > 0 && (
-        <div className="rounded-xl border p-4 mb-5" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: "var(--text-dim)" }}>
-            Tranziții disponibile
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {nextStatuses.map((next) => (
-              <button key={next} onClick={() => setNextTarget(next)}
-                className="px-4 py-1.5 text-xs font-mono rounded-lg border transition-all"
-                style={{
-                  color: NEXT_COLORS[next],
-                  borderColor: `${NEXT_COLORS[next]}60`,
-                  background: `${NEXT_COLORS[next]}15`,
-                }}>
-                → {STATUS_LABELS[next]}
-              </button>
-            ))}
-          </div>
+          )}
         </div>
-      )}
 
-      {/* ── Summary cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-        {[
-          { label: "Total factură", v: fmtNum(invoice.total, invoice.currency),      color: "var(--text)" },
-          { label: "TVA total",     v: fmtNum(invoice.total_vat, invoice.currency),  color: "var(--text-sub)" },
-          { label: "Achitat",       v: fmtNum(invoice.amount_paid, invoice.currency),color: "var(--green)" },
-          { label: "Rest de plată", v: fmtNum(invoice.amount_due, invoice.currency), color: invoice.amount_due > 0 ? "var(--red)" : "var(--green)" },
-        ].map((c) => (
-          <div key={c.label} className="rounded-xl border p-4" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-            <p className="text-xs font-mono mb-1" style={{ color: "var(--text-dim)" }}>{c.label}</p>
-            <p className="text-lg font-bold font-mono" style={{ color: c.color }}>{c.v}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Meta ── */}
-      <div className="rounded-xl border p-5 mb-5" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-        <p className="text-xs font-mono uppercase tracking-widest mb-4" style={{ color: "var(--text-dim)" }}>Detalii</p>
-        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 text-sm">
-          {[
-            { k: "Partener",      v: partner?.denumire ?? invoice.partner_id },
-            { k: "Data emiterii", v: fmtDate(invoice.issued_date) },
-            { k: "Scadență",      v: invoice.due_date ? fmtDate(invoice.due_date) : "—" },
-            { k: "Valută",        v: invoice.currency },
-            { k: "Termeni",       v: invoice.payment_terms ?? "—" },
-            ...(invoice.notes ? [{ k: "Note", v: invoice.notes }] : []),
-          ].map((item) => (
-            <div key={item.k}>
-              <dt className="text-xs font-mono mb-0.5" style={{ color: "var(--text-dim)" }}>{item.k}</dt>
-              <dd style={{ color: "var(--text)" }}>{item.v}</dd>
+        <div className="space-y-6">
+          {/* ── Parties & financials ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="card p-4">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">
+                Partener
+              </p>
+              <p className="text-white font-medium text-sm">
+                {partner?.denumire ?? invoice.partner_id}
+              </p>
+              {partner?.cod_fiscal && (
+                <p className="text-xs font-mono text-slate-400">
+                  {partner.cod_fiscal}
+                </p>
+              )}
+              {partner?.adresa && (
+                <p className="text-xs text-slate-500 mt-1">{partner.adresa}</p>
+              )}
             </div>
-          ))}
-        </dl>
-      </div>
+            <div className="card p-4">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">
+                Rezumat financiar
+              </p>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Subtotal</span>
+                  <span className="font-mono text-slate-300">
+                    {formatRON(invoice.subtotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">TVA</span>
+                  <span className="font-mono text-slate-300">
+                    {formatRON(invoice.total_vat)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold pt-1 border-t border-surface-border">
+                  <span className="text-white">Total</span>
+                  <span className="font-mono text-white">
+                    {formatRON(invoice.total)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs pt-1">
+                  <span className="text-slate-400">Plătit</span>
+                  <span className="font-mono text-success">
+                    {formatRON(invoice.amount_paid)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Rest de plată</span>
+                  <span
+                    className={`font-mono ${parseFloat(invoice.amount_due) > 0 ? "text-warning" : "text-slate-600"}`}
+                  >
+                    {formatRON(invoice.amount_due)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-      {/* ── Lines table ── */}
-      <div className="rounded-xl border overflow-hidden mb-5" style={{ borderColor: "var(--border)" }}>
-        <div className="px-5 py-3 border-b" style={{ background: "var(--bg)", borderColor: "var(--border)" }}>
-          <p className="text-xs font-mono uppercase tracking-widest" style={{ color: "var(--text-dim)" }}>Rânduri factură</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full" style={{ background: "var(--bg-card)" }}>
-            <thead>
-              <tr style={{ background: "var(--bg)" }}>
-                {["#", "Descriere", "Cod", "UM", "Cant.", "Preț", "Disc.%", "TVA", "Subtotal", "TVA val.", "Total rând"].map((h, i) => (
-                  <th key={h}
-                    className={`px-3 py-2.5 text-xs font-mono uppercase tracking-wider whitespace-nowrap ${i > 2 ? "text-right" : "text-left"}`}
-                    style={{ color: "var(--text-dim)", borderBottom: "1px solid var(--border)" }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l) => (
-                <tr key={l.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td className="px-3 py-3 text-xs font-mono" style={{ color: "var(--text-dim)" }}>{l.position}</td>
-                  <td className="px-3 py-3 text-sm" style={{ color: "var(--text)" }}>{l.description}</td>
-                  <td className="px-3 py-3 text-xs font-mono" style={{ color: "var(--text-sub)" }}>{l.product_code ?? "—"}</td>
-                  <td className="px-3 py-3 text-xs font-mono" style={{ color: "var(--text-sub)" }}>{l.unit}</td>
-                  {[l.quantity, l.unit_price, l.discount_percent].map((v, vi) => (
-                    <td key={vi} className="px-3 py-3 text-sm font-mono text-right" style={{ color: "var(--text)" }}>{v}</td>
+          {/* ── Lines ── */}
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-surface-border">
+                    {[
+                      "#",
+                      "Descriere",
+                      "UM",
+                      "Cant.",
+                      "Preț unitar",
+                      "Disc.%",
+                      "TVA",
+                      "Subtotal",
+                      "TVA val.",
+                      "Total",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left text-[10px] text-slate-500 uppercase px-4 py-3 font-medium"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l) => (
+                    <tr
+                      key={l.id}
+                      className="border-b border-surface-border/40"
+                    >
+                      <td className="px-4 py-3 text-slate-500">{l.position}</td>
+                      <td className="px-4 py-3 text-white max-w-[180px]">
+                        <p className="font-medium">{l.description}</p>
+                        {l.product_code && (
+                          <p className="font-mono text-[10px] text-slate-500">
+                            {l.product_code}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400">{l.unit}</td>
+                      <td className="px-4 py-3 font-mono text-slate-300">
+                        {l.quantity}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-300">
+                        {l.unit_price}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-400">
+                        {l.discount_percent}%
+                      </td>
+                      <td className="px-4 py-3 text-slate-400">{l.vat_rate}</td>
+                      <td className="px-4 py-3 font-mono text-slate-400 text-right">
+                        {l.line_subtotal}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-400 text-right">
+                        {l.line_vat}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-white font-medium text-right">
+                        {l.line_total}
+                      </td>
+                    </tr>
                   ))}
-                  <td className="px-3 py-3 text-xs font-mono text-right" style={{ color: "var(--text-sub)" }}>{VAT_LABELS[l.vat_rate]}</td>
-                  <td className="px-3 py-3 text-sm font-mono text-right" style={{ color: "var(--text)" }}>{fmtNum(l.line_subtotal)}</td>
-                  <td className="px-3 py-3 text-sm font-mono text-right" style={{ color: "var(--text-sub)" }}>{fmtNum(l.line_vat)}</td>
-                  <td className="px-3 py-3 text-sm font-mono text-right font-bold" style={{ color: "var(--amber)" }}>
-                    {fmtNum(l.line_total)} {invoice.currency}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Notes ── */}
+          {(invoice.notes || invoice.payment_terms) && (
+            <div className="card p-4 space-y-2">
+              {invoice.payment_terms && (
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+                    Termene plată
+                  </p>
+                  <p className="text-sm text-slate-300 mt-1">
+                    {invoice.payment_terms}
+                  </p>
+                </div>
+              )}
+              {invoice.notes && (
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+                    Observații
+                  </p>
+                  <p className="text-sm text-slate-300 mt-1">{invoice.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Actions ── */}
+          {canEdit && (
+            <div className="card p-5 space-y-4">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+                Acțiuni
+              </p>
+
+              <div className="flex flex-wrap gap-3">
+                {transition && (
+                  <button
+                    onClick={() => handleAdvanceStatus(transition.next)}
+                    disabled={isAdvancingStatus}
+                    className="btn-primary"
+                  >
+                    {isAdvancingStatus ? "Se procesează..." : transition.label}
+                  </button>
+                )}
+                {canCancel && invoice.status !== "Draft" && (
+                  <button
+                    onClick={handleCancelInvoice}
+                    disabled={isAdvancingStatus}
+                    className="btn-danger"
+                  >
+                    Anulează factura
+                  </button>
+                )}
+              </div>
+
+              {canRecordPayment && (
+                <div className="flex items-end gap-3 pt-2 border-t border-surface-border">
+                  <div className="flex-1 max-w-xs">
+                    <label className="input-label">
+                      Înregistrează plată (RON)
+                    </label>
+                    <input
+                      type="number"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="input-field font-mono"
+                      placeholder={invoice.amount_due}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <button
+                    onClick={handleRecordPayment}
+                    disabled={isRecordingPayment || !paymentAmount}
+                    className="btn-primary"
+                  >
+                    {isRecordingPayment
+                      ? "Se înregistrează..."
+                      : "Înregistrează"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* ── Payment panel ── */}
-      {canPayment && (
-        <div className="rounded-xl border p-5" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-          <p className="text-xs font-mono uppercase tracking-widest mb-4" style={{ color: "var(--text-dim)" }}>
-            Înregistrează plată
-          </p>
-          <div className="flex items-end gap-3 flex-wrap">
-            <div className="flex-1 min-w-48 max-w-xs">
-              <label className="block text-xs font-mono mb-1.5" style={{ color: "var(--text-sub)" }}>
-                Sumă ({invoice.currency}) — rest: {fmtNum(invoice.amount_due)}
-              </label>
-              <input
-                type="number" step="0.01" min="0.01"
-                value={payAmt} onChange={(e) => setPayAmt(e.target.value)}
-                placeholder={fmtNum(invoice.amount_due)}
-                className="w-full rounded-lg px-3 py-2 text-sm font-mono border outline-none transition-colors"
-                style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }}
-                onFocus={(e) => (e.target.style.borderColor = "var(--green)")}
-                onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-              />
-            </div>
-            <button onClick={doPayment} disabled={savingPay || !payAmt}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50"
-              style={{ color: "var(--green)", background: "var(--green-bg)", borderColor: "var(--green)" }}>
-              {savingPay && <span className="w-3.5 h-3.5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--green)" }} />}
-              Înregistrează
-            </button>
-            <button onClick={() => setPayAmt(String(invoice.amount_due.toFixed(2)))}
-              className="text-xs font-mono transition-colors" style={{ color: "var(--text-dim)" }}>
-              plată integrală →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Dialogs ── */}
-      <Confirm
-        open={!!nextTarget}
-        title="Confirmă tranziție"
-        body={`Schimbi starea în "${nextTarget ? STATUS_LABELS[nextTarget] : ""}"?`}
-        ok="Confirmă"
-        danger={nextTarget === "Cancelled"}
-        loading={transiting}
-        onOk={doTransition}
-        onCancel={() => setNextTarget(null)}
-      />
-      <Confirm
-        open={showDel}
-        title="Șterge factură"
-        body={`Ștergi definitiv factura "${numStr}"? Acțiunea este ireversibilă.`}
-        ok="Șterge"
-        loading={deleting}
-        onOk={doDelete}
-        onCancel={() => setShowDel(false)}
-      />
-    </div>
+    </AppLayout>
   );
 }

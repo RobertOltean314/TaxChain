@@ -22,3 +22,5 @@ RUN apt-get update && apt-get install -y ca-certificates
 COPY --from=builder /app/target/release/taxchain .
 
 CMD ["./taxchain"]
+
+EXPOSE 8080

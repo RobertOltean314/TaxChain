@@ -1,4 +1,5 @@
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, patch, post, put, web};
+use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
@@ -25,10 +26,68 @@ fn authenticated(
 }
 
 // ============================================================================
+// QUERY PARAMS
+// ============================================================================
+
+#[derive(Deserialize)]
+pub struct NextNumberQuery {
+    pub series: String,
+}
+
+// ============================================================================
 // HANDLERS
 // ============================================================================
 
-/// `GET /invoice` — list all invoices owned by the authenticated user.
+/// `GET /factura/next-number?series=FC`
+///
+/// Suggests the next invoice number for the given series, scoped to the
+/// authenticated user's issuer entity.
+///
+/// Logic: find MAX(numar) in factura for this series + this user's entity,
+/// parse the integer suffix, increment by 1, return the suggestion.
+/// The user is free to override — this is advisory only.
+///
+/// Response: `{ "series": "FC", "next_number": "FC-2025-007" }`
+///
+/// NOTE: This handler must be registered BEFORE `/{id}` in the scope,
+/// otherwise Actix will try to parse "next-number" as a UUID and return 400.
+#[get("/next-number")]
+pub async fn get_next_invoice_number(
+    req: HttpRequest,
+    repo: web::Data<DynInvoiceRepository>,
+    query: web::Query<NextNumberQuery>,
+) -> impl Responder {
+    let (_, user_id) = match authenticated(
+        &req,
+        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+    ) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+
+    let series = query.series.trim().to_uppercase();
+
+    if series.is_empty() {
+        return HttpResponse::UnprocessableEntity()
+            .json(json!({ "error": "series query parameter cannot be empty" }));
+    }
+
+    match repo.get_next_number_for_series(user_id, &series).await {
+        Ok(next_number) => HttpResponse::Ok().json(json!({
+            "series": series,
+            "next_number": next_number
+        })),
+        Err(e) => {
+            eprintln!("get_next_invoice_number error: {e}");
+            HttpResponse::InternalServerError().json(json!({
+                "error": "Failed to compute next invoice number",
+                "details": e.to_string()
+            }))
+        }
+    }
+}
+
+/// `GET /factura` — list all invoices owned by the authenticated user.
 #[get("")]
 pub async fn find_all_invoices(
     req: HttpRequest,
@@ -54,7 +113,7 @@ pub async fn find_all_invoices(
     }
 }
 
-/// `GET /invoice/:id` — full invoice with lines.
+/// `GET /factura/:id` — full invoice with lines.
 #[get("/{id}")]
 pub async fn get_invoice_by_id(
     req: HttpRequest,
@@ -86,7 +145,6 @@ pub async fn get_invoice_by_id(
         }
     };
 
-    // Taxpayers may only view their own invoices
     if user.claims().role == UserRole::Taxpayer && invoice.created_by != user_id {
         return HttpResponse::Forbidden()
             .json(json!({ "error": "Access denied — you can only view your own invoices" }));
@@ -106,7 +164,7 @@ pub async fn get_invoice_by_id(
     HttpResponse::Ok().json(json!({ "invoice": invoice, "lines": lines }))
 }
 
-/// `POST /invoice` — create a new invoice with lines (Admin or Taxpayer).
+/// `POST /factura` — create a new invoice with lines (Admin or Taxpayer).
 #[post("")]
 pub async fn create_invoice(
     req: HttpRequest,
@@ -151,7 +209,7 @@ pub async fn create_invoice(
     }
 }
 
-/// `PUT /invoice/:id` — replace header + lines (Draft only, Admin or Taxpayer own).
+/// `PUT /factura/:id` — replace header + lines (Draft only, Admin or Taxpayer own).
 #[put("/{id}")]
 pub async fn update_invoice(
     req: HttpRequest,
@@ -222,12 +280,7 @@ pub async fn update_invoice(
     }
 }
 
-/// `PATCH /invoice/:id/status` — advance the invoice lifecycle.
-///
-/// Role matrix:
-///   Draft → Issued, Issued → Sent, Sent → Paid : Admin + Taxpayer (own only)
-///   Any → Cancelled                            : Admin + Taxpayer (own only)
-///   Auditor                                    : read-only, cannot change status
+/// `PATCH /factura/:id/status` — advance the invoice lifecycle.
 #[patch("/{id}/status")]
 pub async fn update_invoice_status(
     req: HttpRequest,
@@ -286,7 +339,7 @@ pub async fn update_invoice_status(
     }
 }
 
-/// `PATCH /invoice/:id/payment` — record a cumulative payment amount.
+/// `PATCH /factura/:id/payment` — record a cumulative payment amount.
 #[patch("/{id}/payment")]
 pub async fn update_invoice_payment(
     req: HttpRequest,
@@ -356,7 +409,7 @@ pub async fn update_invoice_payment(
     }
 }
 
-/// `DELETE /invoice/:id` — only Draft invoices can be deleted.
+/// `DELETE /factura/:id` — only Draft invoices can be deleted.
 #[delete("/{id}")]
 pub async fn delete_invoice(
     req: HttpRequest,

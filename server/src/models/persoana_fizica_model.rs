@@ -5,6 +5,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::validators::{validate_cnp, validate_cod_postal, validate_iban, validate_telefon};
+use crate::wallet::generator::generate_custodial_wallet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "stare_persoana_fizica")]
@@ -112,7 +113,7 @@ pub struct PersoanaFizicaRequest {
     pub stare: Option<StarePersoanaFizica>,
 
     #[validate(length(max = 100, message = "Wallet must be max 100 characters"))]
-    pub wallet: String,
+    pub wallet: Option<String>,
 }
 
 impl PersoanaFizica {
@@ -154,6 +155,17 @@ impl PersoanaFizica {
 
     pub fn from_request(req: PersoanaFizicaRequest) -> Self {
         let now = Utc::now();
+        let wallet = req.wallet.unwrap_or_else(|| {
+            // Generate a custodial wallet if not provided
+            match generate_custodial_wallet() {
+                Ok((address, _)) => address,
+                Err(e) => {
+                    eprintln!("Failed to generate wallet: {}", e);
+                    // Fallback to a placeholder or panic? For now, use a placeholder
+                    "0x0000000000000000000000000000000000000000".to_string()
+                }
+            }
+        });
         Self {
             id: Uuid::new_v4(),
             cnp: req.cnp.clone(),
@@ -168,7 +180,7 @@ impl PersoanaFizica {
             telefon: req.telefon.clone(),
             email: req.email.clone(),
             stare: req.stare.unwrap_or_default(),
-            wallet: req.wallet.clone(),
+            wallet,
             created_at: now,
             updated_at: now,
         }
@@ -176,6 +188,7 @@ impl PersoanaFizica {
 
     pub fn update_from_request(existing: &PersoanaFizica, req: &PersoanaFizicaRequest) -> Self {
         let now = Utc::now();
+        let wallet = req.wallet.clone().unwrap_or_else(|| existing.wallet.clone());
         Self {
             id: existing.id,
             cnp: req.cnp.clone(),
@@ -190,7 +203,7 @@ impl PersoanaFizica {
             telefon: req.telefon.clone(),
             email: req.email.clone(),
             stare: req.stare.unwrap_or(existing.stare),
-            wallet: req.wallet.clone(),
+            wallet,
             created_at: existing.created_at,
             updated_at: now,
         }

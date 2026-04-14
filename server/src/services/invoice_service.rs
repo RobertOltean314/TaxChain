@@ -2,6 +2,7 @@ use std::io;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use chrono::Utc;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -22,9 +23,7 @@ pub struct InvoiceWithLines {
 }
 
 // ============================================================================
-// SQL — DB columns aliased to English Rust field names
-// NUMERIC columns are cast to ::text so sqlx reads them as String.
-// We parse them to Decimal in the row→model conversion.
+// SQL CONSTANTS
 // ============================================================================
 
 const SELECT_INVOICE: &str = "
@@ -237,7 +236,7 @@ const DELETE_INVOICE: &str =
     "DELETE FROM factura WHERE id = $1 AND created_by = $2 AND stare = 'Draft'::stare_factura";
 
 // ============================================================================
-// ROW TYPES — NUMERIC columns as String
+// ROW TYPES
 // ============================================================================
 
 #[derive(sqlx::FromRow)]
@@ -433,6 +432,17 @@ pub trait InvoiceRepository: Send + Sync {
         user_id: Uuid,
     ) -> Result<Option<Invoice>, sqlx::Error>;
     async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<bool, sqlx::Error>;
+
+    /// Returns the next suggested invoice number for a given series + user.
+    ///
+    /// Scans `factura` for the highest existing number matching the pattern
+    /// `{SERIES}-{YEAR}-{NNN}` for this user's entity, then increments.
+    /// If no invoices exist yet for this series, returns `{SERIES}-{YEAR}-001`.
+    async fn get_next_number_for_series(
+        &self,
+        user_id: Uuid,
+        series: &str,
+    ) -> Result<String, sqlx::Error>;
 }
 
 pub type DynInvoiceRepository = Arc<dyn InvoiceRepository>;
@@ -523,6 +533,47 @@ impl InvoiceRepository for PgInvoiceRepository {
         rows.into_iter().map(row_to_line).collect()
     }
 
+    async fn get_next_number_for_series(
+        &self,
+        user_id: Uuid,
+        series: &str,
+    ) -> Result<String, sqlx::Error> {
+        let current_year = Utc::now().format("%Y").to_string();
+
+        // Find the highest number for this user + series + current year.
+        // Numbers follow the pattern: {SERIES}-{YEAR}-{NNN}
+        // We match on prefix and extract the integer suffix.
+        let prefix = format!("{series}-{current_year}-");
+
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT numar FROM factura
+             WHERE created_by = $1
+               AND serie = $2
+               AND numar LIKE $3
+             ORDER BY numar DESC
+             LIMIT 1",
+        )
+        .bind(user_id)
+        .bind(series)
+        .bind(format!("{prefix}%"))
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let next_seq: u32 = match row {
+            Some((last_number,)) => {
+                // Parse the integer suffix after the prefix
+                last_number
+                    .strip_prefix(&prefix)
+                    .and_then(|suffix| suffix.parse::<u32>().ok())
+                    .map(|n| n + 1)
+                    .unwrap_or(1)
+            }
+            None => 1,
+        };
+
+        Ok(format!("{series}-{current_year}-{next_seq:03}"))
+    }
+
     async fn create(
         &self,
         invoice: Invoice,
@@ -543,11 +594,11 @@ impl InvoiceRepository for PgInvoiceRepository {
             .bind(invoice.issuer_pj_id)
             .bind(invoice.partner_id)
             .bind(&invoice.currency)
-            .bind("0") // total_fara_tva
-            .bind("0") // total_tva
-            .bind("0") // total_cu_tva
-            .bind("0") // suma_platita
-            .bind("0") // rest_de_plata
+            .bind("0")
+            .bind("0")
+            .bind("0")
+            .bind("0")
+            .bind("0")
             .bind(invoice.reference_invoice_id)
             .bind(&invoice.notes)
             .bind(&invoice.payment_terms)
@@ -559,12 +610,12 @@ impl InvoiceRepository for PgInvoiceRepository {
 
         let (subtotal, total_vat, total) = self.insert_lines(&mut tx, invoice.id, lines).await?;
 
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         sqlx::query(UPDATE_TOTALS)
             .bind(subtotal.to_string())
             .bind(total_vat.to_string())
             .bind(total.to_string())
-            .bind(total.to_string()) // amount_due = total when nothing paid yet
+            .bind(total.to_string())
             .bind(now)
             .bind(invoice.id)
             .execute(&mut *tx)
@@ -628,7 +679,7 @@ impl InvoiceRepository for PgInvoiceRepository {
 
         let (subtotal, total_vat, total) = self.insert_lines(&mut tx, id, lines).await?;
 
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         sqlx::query(UPDATE_TOTALS)
             .bind(subtotal.to_string())
             .bind(total_vat.to_string())
@@ -660,7 +711,7 @@ impl InvoiceRepository for PgInvoiceRepository {
         status: InvoiceStatus,
         user_id: Uuid,
     ) -> Result<Option<Invoice>, sqlx::Error> {
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         let row = sqlx::query_as::<_, InvoiceRow>(UPDATE_STATUS)
             .bind(status_to_db(status))
             .bind(now)
@@ -678,7 +729,7 @@ impl InvoiceRepository for PgInvoiceRepository {
         amount: Decimal,
         user_id: Uuid,
     ) -> Result<Option<Invoice>, sqlx::Error> {
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         let row = sqlx::query_as::<_, InvoiceRow>(UPDATE_PAYMENT)
             .bind(amount.to_string())
             .bind(now)

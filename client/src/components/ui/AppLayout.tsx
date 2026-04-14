@@ -1,78 +1,122 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
+import { useToast } from "./Toast";
 
-const NAV = [
-  { to: "/dashboard",         icon: "⊞", label: "Dashboard",         roles: ["Admin","Taxpayer","Auditor"] },
-  { to: "/persoane-fizice",   icon: "◉", label: "Persoane Fizice",   roles: ["Admin","Auditor"] },
-  { to: "/persoane-juridice", icon: "▣", label: "Persoane Juridice", roles: ["Admin","Auditor"] },
-  { to: "/parteneri",         icon: "◇", label: "Parteneri",         roles: ["Admin","Taxpayer","Auditor"] },
-  { to: "/facturi",           icon: "◈", label: "Facturi",           roles: ["Admin","Taxpayer","Auditor"] },
-] as const;
+// ── Nav item definitions per role ────────────────────────────────────────────
+// `to` uses English routes (/invoices, /partners, /reports).
+// `label` stays Romanian — it is displayed to the user.
 
-export default function AppLayout() {
-  const { user, doLogout } = useAuth();
-  const items = NAV.filter((n) => user && (n.roles as readonly string[]).includes(user.role));
+const TAXPAYER_NAV = [
+  { to: "/dashboard", label: "Dashboard", icon: "⬡" },
+  { to: "/invoices", label: "Facturi", icon: "◉" },
+  { to: "/partners", label: "Parteneri", icon: "◈" },
+  { to: "/reports", label: "Rapoarte", icon: "◫" },
+];
+
+const ADMIN_EXTRA_NAV = [
+  { to: "/persoane-fizice", label: "Persoane Fizice", icon: "◈" },
+  { to: "/persoane-juridice", label: "Persoane Juridice", icon: "◆" },
+];
+
+const AUDITOR_NAV = [
+  { to: "/dashboard", label: "Dashboard", icon: "⬡" },
+  { to: "/invoices", label: "Facturi", icon: "◉" },
+  { to: "/partners", label: "Parteneri", icon: "◈" },
+  { to: "/reports", label: "Rapoarte", icon: "◫" },
+  { to: "/persoane-fizice", label: "Persoane Fizice", icon: "◈" },
+  { to: "/persoane-juridice", label: "Persoane Juridice", icon: "◆" },
+];
+
+function NavSection({
+  items,
+}: {
+  items: { to: string; label: string; icon: string }[];
+}) {
+  return (
+    <>
+      {items.map(({ to, label, icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
+              isActive
+                ? "bg-brand/10 text-brand border border-brand/20"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`
+          }
+        >
+          <span className="text-base leading-none">{icon}</span>
+          <span>{label}</span>
+        </NavLink>
+      ))}
+    </>
+  );
+}
+
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    await logout();
+    toast("Ai fost deconectat", "info");
+    navigate("/login");
+  };
+
+  const primaryNav = user?.role === "Auditor" ? AUDITOR_NAV : TAXPAYER_NAV;
+  const adminNav = user?.role === "Admin" ? ADMIN_EXTRA_NAV : [];
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
-      {/* ── Sidebar ── */}
-      <aside className="w-52 flex-shrink-0 flex flex-col"
-        style={{ background: "var(--bg-card)", borderRight: "1px solid var(--border)" }}>
-
-        {/* Brand */}
-        <div className="px-5 py-5" style={{ borderBottom: "1px solid var(--border)" }}>
-          <span className="font-display text-2xl" style={{ color: "var(--amber)" }}>TaxChain</span>
-          <p className="text-xs font-mono mt-0.5" style={{ color: "var(--text-dim)" }}>
-            Platformă fiscală
-          </p>
+    <div className="min-h-screen flex bg-surface">
+      {/* Sidebar */}
+      <aside className="w-56 shrink-0 flex flex-col border-r border-surface-border bg-surface-raised/50">
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-surface-border">
+          <span className="font-display text-xl text-white tracking-tight">
+            Tax<span className="text-brand">Chain</span>
+          </span>
         </div>
 
-        {/* Nav links */}
-        <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-          {items.map((item) => (
-            <NavLink key={item.to} to={item.to}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150"
-              style={({ isActive }) => isActive
-                ? { background: "var(--amber-bg)", color: "var(--amber)", borderLeft: "2px solid var(--amber)", paddingLeft: "10px" }
-                : { color: "var(--text-sub)" }
-              }
-              onMouseEnter={(e) => { if (!(e.currentTarget as any)._active) e.currentTarget.style.color = "var(--text)"; }}
-              onMouseLeave={(e) => { if (!(e.currentTarget as any)._active) e.currentTarget.style.color = "var(--text-sub)"; }}
-            >
-              <span className="text-sm opacity-70">{item.icon}</span>
-              {item.label}
-            </NavLink>
-          ))}
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+          <NavSection items={primaryNav} />
+
+          {adminNav.length > 0 && (
+            <>
+              <div className="my-2 border-t border-surface-border" />
+              <p className="px-3 text-[10px] text-slate-600 uppercase tracking-widest mb-1">
+                Administrare
+              </p>
+              <NavSection items={adminNav} />
+            </>
+          )}
         </nav>
 
-        {/* User */}
-        <div className="px-4 py-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 font-mono"
-              style={{ background: "var(--amber-bg)", color: "var(--amber)", border: "1px solid var(--amber-dim)" }}>
-              {(user?.display_name ?? user?.email ?? "U")[0].toUpperCase()}
+        {/* User section */}
+        <div className="px-3 py-4 border-t border-surface-border">
+          <div className="px-3 py-2 mb-2">
+            <div className="text-xs text-slate-500 truncate">
+              {user?.display_name ?? user?.email ?? "Utilizator"}
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium truncate" style={{ color: "var(--text)" }}>
-                {user?.display_name ?? user?.email ?? "Utilizator"}
-              </p>
-              <p className="text-xs font-mono" style={{ color: "var(--text-dim)" }}>{user?.role}</p>
+            <div className="text-xs font-mono text-slate-600 truncate mt-0.5">
+              {user?.role}
             </div>
           </div>
-          <button onClick={doLogout}
-            className="w-full text-xs font-medium rounded-lg px-2 py-1.5 text-left transition-colors"
-            style={{ color: "var(--red)", background: "var(--red-bg)", border: "1px solid transparent" }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--red)")}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "transparent")}>
-            ⏻ Deconectare
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400
+                       hover:text-danger hover:bg-danger/5 transition-all duration-150"
+          >
+            <span className="text-base leading-none">⏻</span>
+            <span>Deconectare</span>
           </button>
         </div>
       </aside>
 
-      {/* ── Content ── */}
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+      {/* Main content */}
+      <main className="flex-1 overflow-auto">{children}</main>
     </div>
   );
 }

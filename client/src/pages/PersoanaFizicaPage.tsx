@@ -4,7 +4,17 @@ import { useAuth } from "../auth/useAuth";
 import { pfGetAll, pfDelete } from "../api/persoanaFizica.api";
 import { Confirm } from "../components/ui/Confirm";
 import { useToast } from "../components/ui/Toast";
-import { Spinner, Empty, PageHeader, BtnPrimary, THead, TRow, TD, Dash, Badge } from "../components/ui/ui";
+import {
+  Spinner,
+  Empty,
+  PageHeader,
+  BtnPrimary,
+  THead,
+  TRow,
+  TD,
+  Dash,
+  Badge,
+} from "../components/ui/ui";
 import type { PersoanaFizica } from "../types";
 
 export default function PersoanaFizicaPage() {
@@ -21,19 +31,25 @@ export default function PersoanaFizicaPage() {
 
   useEffect(() => {
     pfGetAll()
-      .then((d) => { setRows(d); setFiltered(d); })
+      .then((d) => {
+        setRows(d);
+        setFiltered(d);
+      })
       .catch(() => toast("Eroare la încărcare.", "err"))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     const s = q.toLowerCase();
-    setFiltered(rows.filter((r) =>
-      r.cnp.includes(s) ||
-      r.nume.toLowerCase().includes(s) ||
-      r.prenume.toLowerCase().includes(s) ||
-      (r.email ?? "").toLowerCase().includes(s),
-    ));
+    setFiltered(
+      rows.filter(
+        (r) =>
+          r.cnp.includes(s) ||
+          r.nume.toLowerCase().includes(s) ||
+          r.prenume.toLowerCase().includes(s) ||
+          (r.email ?? "").toLowerCase().includes(s),
+      ),
+    );
   }, [q, rows]);
 
   const doDelete = async () => {
@@ -43,8 +59,12 @@ export default function PersoanaFizicaPage() {
       await pfDelete(del.id);
       toast("Persoană ștearsă.", "ok");
       setRows((p) => p.filter((r) => r.id !== del.id));
-    } catch { toast("Eroare la ștergere.", "err"); }
-    finally { setDeleting(false); setDel(null); }
+    } catch {
+      toast("Eroare la ștergere.", "err");
+    } finally {
+      setDeleting(false);
+      setDel(null);
+    }
   };
 
   return (
@@ -52,41 +72,89 @@ export default function PersoanaFizicaPage() {
       <PageHeader
         title="Persoane Fizice"
         sub={`${filtered.length} înregistrări`}
-        action={isAdmin ? (
-          <BtnPrimary onClick={() => navigate("/persoane-fizice/new")}>+ Adaugă</BtnPrimary>
-        ) : undefined}
+        action={
+          isAdmin ? (
+            <BtnPrimary onClick={() => navigate("/persoane-fizice/new")}>
+              + Adaugă
+            </BtnPrimary>
+          ) : undefined
+        }
       />
 
       <input
-        value={q} onChange={(e) => setQ(e.target.value)}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
         placeholder="Caută după CNP, nume sau email…"
         className="mb-5 w-72 rounded-lg px-3 py-2 text-sm font-mono border outline-none transition-colors"
-        style={{ background: "var(--bg-card)", borderColor: "var(--border)", color: "var(--text)" }}
+        style={{
+          background: "var(--bg-card)",
+          borderColor: "var(--border)",
+          color: "var(--text)",
+        }}
         onFocus={(e) => (e.target.style.borderColor = "var(--amber)")}
         onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
       />
 
-      {loading ? <Spinner /> : filtered.length === 0 ? (
-        <Empty msg={q ? "Niciun rezultat." : "Nicio persoană fizică înregistrată."} />
+      {loading ? (
+        <Spinner />
+      ) : filtered.length === 0 ? (
+        <Empty
+          msg={q ? "Niciun rezultat." : "Nicio persoană fizică înregistrată."}
+        />
       ) : (
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--border)" }}>
-          <table className="min-w-full" style={{ background: "var(--bg-card)" }}>
-            <THead cols={["CNP", "Nume", "Prenume", "Email", "Stare", ...(isAdmin ? ["Acțiuni"] : [])]} />
+        <div
+          className="rounded-xl border overflow-hidden"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <table
+            className="min-w-full"
+            style={{ background: "var(--bg-card)" }}
+          >
+            <THead
+              cols={[
+                "CNP",
+                "Nume",
+                "Prenume",
+                "Email",
+                "Stare",
+                ...(isAdmin ? ["Acțiuni"] : []),
+              ]}
+            />
             <tbody>
               {filtered.map((r) => (
-                <TRow key={r.id} onClick={() => navigate(`/persoane-fizice/${r.id}`)}>
+                <TRow
+                  key={r.id}
+                  onClick={() => navigate(`/persoane-fizice/${r.id}`)}
+                >
                   <TD mono>{r.cnp}</TD>
-                  <TD><span className="font-medium">{r.nume}</span></TD>
+                  <TD>
+                    <span className="font-medium">{r.nume}</span>
+                  </TD>
                   <TD>{r.prenume}</TD>
                   <TD>{r.email ?? <Dash />}</TD>
-                  <TD><Badge value={r.stare} variant="pf" /></TD>
+                  <TD>
+                    <Badge value={r.stare} variant="pf" />
+                  </TD>
                   {isAdmin && (
                     <TD>
-                      <div className="flex justify-end gap-3" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => navigate(`/persoane-fizice/${r.id}`)}
-                          className="text-xs font-mono" style={{ color: "var(--amber)" }}>editează</button>
-                        <button onClick={() => setDel(r)}
-                          className="text-xs font-mono" style={{ color: "var(--red)" }}>șterge</button>
+                      <div
+                        className="flex justify-end gap-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => navigate(`/persoane-fizice/${r.id}`)}
+                          className="text-xs font-mono"
+                          style={{ color: "var(--amber)" }}
+                        >
+                          editează
+                        </button>
+                        <button
+                          onClick={() => setDel(r)}
+                          className="text-xs font-mono"
+                          style={{ color: "var(--red)" }}
+                        >
+                          șterge
+                        </button>
                       </div>
                     </TD>
                   )}
@@ -98,11 +166,13 @@ export default function PersoanaFizicaPage() {
       )}
 
       <Confirm
-        open={!!del}
+        isOpen={!!del}
         title="Șterge persoană fizică"
-        body={`Ștergi definitiv pe "${del?.nume} ${del?.prenume}"?`}
-        ok="Șterge" loading={deleting}
-        onOk={doDelete} onCancel={() => setDel(null)}
+        message={`Ștergi definitiv pe "${del?.nume} ${del?.prenume}"?`}
+        confirmLabel="Șterge"
+        isLoading={deleting}
+        onConfirm={doDelete}
+        onCancel={() => setDel(null)}
       />
     </div>
   );

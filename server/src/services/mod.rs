@@ -1,3 +1,4 @@
+pub mod e_factura_service;
 pub mod invoice_service;
 pub mod partner_service;
 pub mod persoana_fizica_service;
