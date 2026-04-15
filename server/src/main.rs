@@ -12,8 +12,11 @@ use taxchain::{
             wallet_nonce_handler, wallet_verify_handler,
         },
         create_persoana_fizica, create_persoana_juridica, delete_persoana_fizica,
-        delete_persoana_juridica, find_all_persoana_fizica, find_all_persoana_juridica,
-        get_persoana_fizica_by_id,
+        delete_persoana_juridica,
+        efactura_handlers::{
+            generate_invoice_xml, get_efactura_by_cif, get_efactura_status, submit_efactura,
+        },
+        find_all_persoana_fizica, find_all_persoana_juridica, get_persoana_fizica_by_id,
         invoice_handlers::{
             create_invoice, delete_invoice, find_all_invoices, get_invoice_by_id,
             get_next_invoice_number, update_invoice, update_invoice_payment, update_invoice_status,
@@ -26,6 +29,7 @@ use taxchain::{
         update_persoana_fizica, update_persoana_juridica,
     },
     services::{
+        e_factura_service::{DynEFacturaRepository, PgEFacturaRepository},
         invoice_service::{DynInvoiceRepository, PgInvoiceRepository},
         partner_service::{DynPartnerRepository, PgPartnerRepository},
         persoana_fizica_service::{DynPersoanaFizicaRepository, PgPersoanaFizicaRepository},
@@ -57,6 +61,7 @@ async fn main() -> std::io::Result<()> {
     let user_repo: DynUserRepository = Arc::new(PgUserRepository::new(pool.clone()));
     let partener_repo: DynPartnerRepository = Arc::new(PgPartnerRepository::new(pool.clone()));
     let invoice_repo: DynInvoiceRepository = Arc::new(PgInvoiceRepository::new(pool.clone()));
+    let efactura_repo: DynEFacturaRepository = Arc::new(PgEFacturaRepository::new(pool.clone()));
 
     let auth_config = AuthConfig {
         jwt_secret,
@@ -83,6 +88,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(http_client.clone()))
             .app_data(web::Data::new(partener_repo.clone()))
             .app_data(web::Data::new(invoice_repo.clone()))
+            .app_data(web::Data::new(efactura_repo.clone()))
             // ── Auth (public) ──────────────────────────────────────────────
             .service(
                 web::scope("/auth")
@@ -140,6 +146,15 @@ async fn main() -> std::io::Result<()> {
                     .service(update_invoice_status)
                     .service(update_invoice_payment)
                     .service(delete_invoice),
+            )
+            // ── eFactura (ANAF mock) ───────────────────────────────────────
+            .service(
+                web::scope("/efactura")
+                    .wrap(JwtAuthMiddleware)
+                    .service(submit_efactura)
+                    .service(get_efactura_status)
+                    .service(get_efactura_by_cif)
+                    .service(generate_invoice_xml),
             )
     })
     .bind("0.0.0.0:8080")?

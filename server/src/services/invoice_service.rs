@@ -203,8 +203,8 @@ const UPDATE_STATUS: &str = "
 
 const UPDATE_PAYMENT: &str = "
     UPDATE factura
-    SET suma_platita  = $1::numeric,
-        rest_de_plata = total_cu_tva - $1::numeric,
+    SET suma_platita  = suma_platita + $1::numeric,
+        rest_de_plata = total_cu_tva - (suma_platita + $1::numeric),
         updated_at    = $2
     WHERE id = $3 AND created_by = $4
     RETURNING

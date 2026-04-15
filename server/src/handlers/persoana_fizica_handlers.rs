@@ -133,8 +133,25 @@ pub async fn create_persoana_fizica(
         }
         Err(e) => {
             eprintln!("create error: {e}");
-            let error_body = json!({"error": "We failed to create the Persoana Fizica Entity. Please review the details", "details": e.to_string()});
-            HttpResponse::InternalServerError().json(error_body)
+
+            // Convert database constraint violations to user-friendly validation errors.
+            // The application already validates the phone format; this only maps DB constraint failures.
+            let error_message = if e.to_string().contains("persoana_fizica_cnp_key") {
+                "A person with this CNP already exists"
+            } else if e.to_string().contains("persoana_fizica_telefon_check") {
+                "Phone number format is invalid. Expected format: +407xxxxxxxx or 07xxxxxxxx"
+            } else if e.to_string().contains("persoana_fizica_email_check") {
+                "Email format is invalid"
+            } else if e.to_string().contains("persoana_fizica_iban_key") {
+                "This IBAN is already registered to another account"
+            } else {
+                "Failed to create PersoanaFizica. Please check your input data."
+            };
+
+            HttpResponse::UnprocessableEntity().json(json!({
+                "error": "Validation failed",
+                "details": [error_message]
+            }))
         }
     }
 }

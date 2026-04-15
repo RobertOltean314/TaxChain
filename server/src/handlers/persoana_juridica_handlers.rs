@@ -88,7 +88,23 @@ pub async fn create_persoana_juridica(
     }
 
     if let Err(errors) = body.validate() {
-        return HttpResponse::BadRequest().body(errors.to_string());
+        let error_messages: Vec<String> = errors
+            .field_errors()
+            .iter()
+            .flat_map(|(field, errs)| {
+                errs.iter().map(move |err| {
+                    format!(
+                        "{}: {}",
+                        field,
+                        err.message.as_deref().unwrap_or("validation failed")
+                    )
+                })
+            })
+            .collect();
+        return HttpResponse::UnprocessableEntity().json(json!({
+            "error": "Validation failed",
+            "details": error_messages
+        }));
     }
 
     let persoana = PersoanaJuridica::from_request(body.into_inner());
@@ -111,8 +127,25 @@ pub async fn create_persoana_juridica(
             HttpResponse::Created().json(created)
         }
         Err(e) => {
-            let error_body = json!({"error": "We failed to create the Persoana Juridica Entity. Please review the details", "details": e.to_string()});
-            HttpResponse::InternalServerError().json(error_body)
+            eprintln!("create error: {e}");
+
+            // Convert database constraint violations to user-friendly validation errors
+            let error_message = if e.to_string().contains("persoana_juridica_cod_fiscal_key") {
+                "A company with this fiscal code already exists"
+            } else if e.to_string().contains("persoana_juridica_telefon_check") {
+                "Phone number format is invalid. Expected format: +407xxxxxxxx or 07xxxxxxxx"
+            } else if e.to_string().contains("persoana_juridica_email_check") {
+                "Email format is invalid"
+            } else if e.to_string().contains("persoana_juridica_iban_key") {
+                "This IBAN is already registered to another account"
+            } else {
+                "Failed to create PersoanaJuridica. Please check your input data."
+            };
+
+            HttpResponse::UnprocessableEntity().json(json!({
+                "error": "Validation failed",
+                "details": [error_message]
+            }))
         }
     }
 }

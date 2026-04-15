@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useLayoutEffect, useState } from "react";
 import { useAuth } from "../../auth/useAuth";
 import { useToast } from "./Toast";
 
@@ -41,8 +42,8 @@ function NavSection({
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
               isActive
-                ? "bg-brand/10 text-brand border border-brand/20"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
+                ? "bg-blue-50 text-blue-700 border border-blue-200"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
             }`
           }
         >
@@ -58,6 +59,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") {
+      return "dark";
+    }
+    const stored = window.localStorage.getItem("taxchain-theme");
+    if (stored === "dark" || stored === "light") {
+      return stored;
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "dark";
+  });
+
+  useLayoutEffect(() => {
+    document.body.classList.toggle("theme-dark", theme === "dark");
+    document.body.classList.toggle("theme-light", theme === "light");
+    window.localStorage.setItem("taxchain-theme", theme);
+  }, [theme]);
 
   const handleLogout = async () => {
     await logout();
@@ -69,14 +88,31 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const adminNav = user?.role === "Admin" ? ADMIN_EXTRA_NAV : [];
 
   return (
-    <div className="min-h-screen flex bg-surface">
+    <div className="min-h-screen flex bg-surface text-slate-900">
       {/* Sidebar */}
-      <aside className="w-56 shrink-0 flex flex-col border-r border-surface-border bg-surface-raised/50">
+      <aside className="w-64 shrink-0 flex flex-col border-r border-surface-border bg-surface-raised shadow-sm">
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-surface-border">
-          <span className="font-display text-xl text-white tracking-tight">
-            Tax<span className="text-brand">Chain</span>
-          </span>
+        <div className="px-6 py-6 border-b border-surface-border">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-display text-2xl tracking-tight text-[var(--text)]">
+              Tax<span className="text-blue-700">Chain</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              className="rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text)",
+                background: "var(--bg-card)",
+              }}
+            >
+              {theme === "light" ? "🌙 Dark" : "☀️ Light"}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-[var(--text-sub)] max-w-[200px]">
+            Facturare și gestiune fiscală modernă.
+          </p>
         </div>
 
         {/* Nav */}
@@ -85,8 +121,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
           {adminNav.length > 0 && (
             <>
-              <div className="my-2 border-t border-surface-border" />
-              <p className="px-3 text-[10px] text-slate-600 uppercase tracking-widest mb-1">
+              <div className="my-3 border-t border-surface-border" />
+              <p className="px-4 text-[10px] text-slate-500 uppercase tracking-widest mb-2">
                 Administrare
               </p>
               <NavSection items={adminNav} />
@@ -106,8 +142,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400
-                       hover:text-danger hover:bg-danger/5 transition-all duration-150"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:text-red-700 hover:bg-red-50 transition-all duration-150"
           >
             <span className="text-base leading-none">⏻</span>
             <span>Deconectare</span>
@@ -116,7 +151,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto bg-surface p-6">
+        <div className="max-w-7xl mx-auto min-h-[calc(100vh-3rem)]">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

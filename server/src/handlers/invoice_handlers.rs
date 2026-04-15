@@ -8,7 +8,7 @@ use crate::auth::middleware::{AuthenticatedUser, require_role};
 use crate::models::{
     Invoice, InvoicePaymentRequest, InvoiceRequest, InvoiceStatus, InvoiceStatusRequest, UserRole,
 };
-use crate::services::invoice_service::DynInvoiceRepository;
+use crate::services::{invoice_service::DynInvoiceRepository, user_service::DynUserRepository};
 
 // ============================================================================
 // HELPER — extract authenticated user + user_id in one call
@@ -169,9 +169,10 @@ pub async fn get_invoice_by_id(
 pub async fn create_invoice(
     req: HttpRequest,
     repo: web::Data<DynInvoiceRepository>,
-    body: web::Json<InvoiceRequest>,
+    user_repo: web::Data<DynUserRepository>,
+    mut body: web::Json<InvoiceRequest>,
 ) -> impl Responder {
-    let (_, user_id) = match authenticated(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
+    let (user, user_id) = match authenticated(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -183,10 +184,36 @@ pub async fn create_invoice(
         }));
     }
 
+    // Auto-set issuer if not provided
     if body.issuer_pf_id.is_none() && body.issuer_pj_id.is_none() {
-        return HttpResponse::UnprocessableEntity().json(json!({
-            "error": "At least one issuer (issuer_pf_id or issuer_pj_id) is required"
-        }));
+        if user.claims().role == UserRole::Taxpayer {
+            let mut issuer_pf = user.claims().persoana_fizica_id;
+            let mut issuer_pj = user.claims().persoana_juridica_id;
+
+            if issuer_pf.is_none() && issuer_pj.is_none() {
+                if let Ok(user_id) = Uuid::parse_str(&user.claims().sub) {
+                    if let Ok(Some(stored_user)) = user_repo.find_by_id(user_id).await {
+                        issuer_pf = stored_user.persoana_fizica_id;
+                        issuer_pj = stored_user.persoana_juridica_id;
+                    }
+                }
+            }
+
+            if let Some(pf_id) = issuer_pf {
+                body.issuer_pf_id = Some(pf_id);
+            } else if let Some(pj_id) = issuer_pj {
+                body.issuer_pj_id = Some(pj_id);
+            } else {
+                return HttpResponse::UnprocessableEntity().json(json!({
+                    "error": "No issuer entity found. Please create a PersoanaFizica or PersoanaJuridica profile first."
+                }));
+            }
+        } else {
+            // Admins must explicitly specify an issuer
+            return HttpResponse::UnprocessableEntity().json(json!({
+                "error": "At least one issuer (issuer_pf_id or issuer_pj_id) is required"
+            }));
+        }
     }
 
     if body.lines.is_empty() {
@@ -386,10 +413,10 @@ pub async fn update_invoice_payment(
             .json(json!({ "error": "Payment amount cannot be negative" }));
     }
 
-    if body.amount > existing.total {
+    if body.amount > existing.amount_due {
         return HttpResponse::UnprocessableEntity().json(json!({
-            "error": "Payment amount exceeds invoice total",
-            "invoice_total": existing.total.to_string(),
+            "error": "Payment amount exceeds remaining invoice balance",
+            "amount_due": existing.amount_due.to_string(),
             "requested": body.amount.to_string()
         }));
     }
