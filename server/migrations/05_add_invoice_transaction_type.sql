@@ -1,0 +1,6 @@
+-- =========================================================================
+-- TAXCHAIN — MIGRATION 05 (no-op)
+-- tip_tranzactie enum and factura.tip_tranzactie column were already
+-- defined in migration 03_invoice_tables.sql. This file is kept as a
+-- placeholder to preserve migration numbering.
+-- =========================================================================

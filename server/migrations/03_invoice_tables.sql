@@ -38,6 +38,11 @@ CREATE TYPE cota_tva AS ENUM (
     'Scutit'
 );
 
+CREATE TYPE tip_tranzactie AS ENUM (
+    'Venit',
+    'Cheltuiala'
+);
+
 -- PARTENER TABLE
 CREATE TABLE IF NOT EXISTS partener (
     id                  UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,6 +85,7 @@ CREATE TABLE IF NOT EXISTS factura (
     numar                   VARCHAR(50)     NOT NULL,
     serie                   VARCHAR(20),
     tip_document            tip_document    NOT NULL DEFAULT 'FiscalA',
+    tip_tranzactie          tip_tranzactie,
     stare                   stare_factura   NOT NULL DEFAULT 'Draft',
     
     -- Dates

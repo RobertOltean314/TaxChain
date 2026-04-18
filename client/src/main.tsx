@@ -15,6 +15,7 @@ import "@rainbow-me/rainbowkit/styles.css";
 import "./index.css";
 
 import { AuthProvider } from "./auth/AuthContext";
+import { EntityProvider } from "./auth/EntityContext";
 import { ToastProvider } from "./components/ui/Toast";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 
@@ -29,10 +30,14 @@ import { OnboardingPage } from "./pages/OnboardingPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { InvoiceFormPage } from "./pages/InvoiceFormPage";
+import { InvoiceUploadPage } from "./pages/InvoiceUploadPage";
 import { InvoiceDetailPage } from "./pages/InvoiceDetailPage";
 import { PartnersPage } from "./pages/PartnersPage";
 import { PartnerFormPage } from "./pages/PartnerFormPage";
 import { ReportsPage } from "./pages/ReportsPage";
+
+// Entity management
+import { EntitiesPage } from "./pages/EntitiesPage";
 
 // Admin-only entity management
 import PersoanaFizicaPage from "./pages/PersoanaFizicaPage";
@@ -60,6 +65,7 @@ createRoot(document.getElementById("root")!).render(
             })}
           >
             <AuthProvider>
+              <EntityProvider>
               <ToastProvider>
                 <BrowserRouter>
                   <Routes>
@@ -73,6 +79,11 @@ createRoot(document.getElementById("root")!).render(
                     {/* ── Onboarding (authenticated but unlinked Taxpayer) ─ */}
                     <Route element={<ProtectedRoute />}>
                       <Route path="/onboarding" element={<OnboardingPage />} />
+                    </Route>
+
+                    {/* ── Entity management (all authenticated roles) ─────── */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route path="/entities" element={<EntitiesPage />} />
                     </Route>
 
                     {/* ── All authenticated roles ─────────────────────────── */}
@@ -106,6 +117,10 @@ createRoot(document.getElementById("root")!).render(
                       <Route
                         path="/invoices/new"
                         element={<InvoiceFormPage />}
+                      />
+                      <Route
+                        path="/invoices/upload"
+                        element={<InvoiceUploadPage />}
                       />
                       <Route
                         path="/invoices/:id/edit"
@@ -167,6 +182,7 @@ createRoot(document.getElementById("root")!).render(
                   </Routes>
                 </BrowserRouter>
               </ToastProvider>
+              </EntityProvider>
             </AuthProvider>
           </RainbowKitProvider>
         </QueryClientProvider>

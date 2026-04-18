@@ -149,7 +149,7 @@ export function InvoiceDetailPage() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-4xl">
+      <div className="w-full max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-4">

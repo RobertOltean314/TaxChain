@@ -1,6 +1,9 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./useAuth";
+import { useEntity } from "./useEntity";
 import type { UserResponse } from "../types";
+
+const ENTITY_EXEMPT_PATHS = ["/entities", "/onboarding", "/login", "/unauthorized"];
 
 interface ProtectedRouteProps {
   allowedRoles?: UserResponse["role"][];
@@ -16,9 +19,10 @@ interface ProtectedRouteProps {
  */
 export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
+  const { activeEntity, isLoading: entityLoading } = useEntity();
   const location = useLocation();
 
-  if (isLoading) {
+  if (isLoading || entityLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-3">
@@ -46,6 +50,13 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
 
   if (needsOnboarding) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // Entity gate: all authenticated users must have an active entity selected
+  // unless they are on an exempt path (entities picker, onboarding, etc.)
+  const isExempt = ENTITY_EXEMPT_PATHS.some((p) => location.pathname.startsWith(p));
+  if (!activeEntity && !isExempt) {
+    return <Navigate to="/entities" replace />;
   }
 
   return <Outlet />;

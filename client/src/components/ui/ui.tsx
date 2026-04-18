@@ -1,8 +1,11 @@
-import type {
-  ReactNode,
-  InputHTMLAttributes,
-  SelectHTMLAttributes,
-  ButtonHTMLAttributes,
+import {
+  cloneElement,
+  isValidElement,
+  type ReactNode,
+  type ReactElement,
+  type InputHTMLAttributes,
+  type SelectHTMLAttributes,
+  type ButtonHTMLAttributes,
 } from "react";
 import type { InvoiceStatus, PartnerType } from "../../types";
 
@@ -72,20 +75,41 @@ export function Button({
   ...props
 }: BaseButtonProps) {
   const baseClasses =
-    "inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+    "inline-flex items-center justify-center gap-2 font-semibold rounded-xl select-none disabled:opacity-50 disabled:cursor-not-allowed";
 
   const variantClasses = {
-    primary:
-      "bg-blue text-white hover:bg-blue-600 focus:ring-blue-500 shadow-sm",
-    secondary:
-      "bg-bg-card text-text border border-border hover:bg-bg-hover focus:ring-blue-500",
-    ghost:
-      "text-text-sub hover:text-text hover:bg-bg-hover focus:ring-blue-500",
-    danger: "bg-red text-white hover:bg-red-600 focus:ring-red-500",
+    primary: [
+      "text-white border border-transparent",
+      "bg-blue-500",
+      "hover:bg-blue-600 hover:-translate-y-px hover:shadow-[0_6px_20px_rgba(96,165,250,0.35)]",
+      "active:scale-[0.97] active:translate-y-0",
+      "transition-[background-color,box-shadow,transform] duration-150 ease-out",
+      "shadow-[0_2px_8px_rgba(96,165,250,0.22)]",
+    ].join(" "),
+    secondary: [
+      "text-text border border-border bg-bg-card",
+      "hover:bg-bg-hover hover:border-border-hi hover:-translate-y-px",
+      "active:scale-[0.97] active:translate-y-0",
+      "transition-[background-color,border-color,transform] duration-150 ease-out",
+    ].join(" "),
+    ghost: [
+      "text-text-sub border border-transparent bg-transparent",
+      "hover:text-text hover:bg-bg-hover",
+      "active:scale-[0.97]",
+      "transition-[background-color,color,transform] duration-150 ease-out",
+    ].join(" "),
+    danger: [
+      "text-white border border-transparent",
+      "bg-red-500",
+      "hover:bg-red-600 hover:-translate-y-px hover:shadow-[0_6px_16px_rgba(248,113,113,0.35)]",
+      "active:scale-[0.97] active:translate-y-0",
+      "transition-[background-color,box-shadow,transform] duration-150 ease-out",
+      "shadow-[0_2px_8px_rgba(248,113,113,0.18)]",
+    ].join(" "),
   };
 
   const sizeClasses = {
-    sm: "px-3 py-1.5 text-sm",
+    sm: "px-3 py-1.5 text-xs",
     md: "px-4 py-2 text-sm",
     lg: "px-6 py-3 text-base",
   };
@@ -358,6 +382,18 @@ export function FormField({
   children,
 }: FormFieldProps) {
   const fieldId = `field-${Math.random().toString(36).substr(2, 9)}`;
+  const describedBy = error
+    ? `${fieldId}-error`
+    : hint
+      ? `${fieldId}-hint`
+      : undefined;
+
+  const child = isValidElement(children)
+    ? cloneElement(children as ReactElement<any, any>, {
+        id: fieldId,
+        "aria-describedby": describedBy,
+      })
+    : children;
 
   return (
     <div className={`space-y-1.5 ${className}`}>
@@ -370,7 +406,7 @@ export function FormField({
         )}
       </label>
 
-      <div className="relative">{children}</div>
+      <div className="relative">{child}</div>
 
       {hint && !error && (
         <p className="text-xs text-text-dim" id={`${fieldId}-hint`}>
@@ -485,40 +521,65 @@ export function inputCls(err?: boolean) {
   ].join(" ");
 }
 
-// ─── Enhanced Card Component ──────────────────────────────────────────────────
-interface CardProps {
-  children: ReactNode;
-  title?: string;
+// ─── File Upload Component ──────────────────────────────────────────────────
+interface FileUploadProps {
+  accept?: string;
+  multiple?: boolean;
+  onChange: (files: FileList | null) => void;
+  error?: string;
   className?: string;
-  padding?: "sm" | "md" | "lg";
+  children?: ReactNode;
 }
 
-export function EnhancedCard({
-  children,
-  title,
+export function FileUpload({
+  accept,
+  multiple = false,
+  onChange,
+  error,
   className = "",
-  padding = "md",
-}: CardProps) {
-  const paddingClasses = {
-    sm: "p-4",
-    md: "p-6",
-    lg: "p-8",
+  children,
+}: FileUploadProps) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.files);
   };
 
   return (
-    <div
-      className={`rounded-xl border bg-bg-card shadow-sm ${paddingClasses[padding]} ${className}`}
-      style={{ borderColor: "var(--border)" }}
-    >
-      {title && (
-        <h3 className="text-sm font-mono uppercase tracking-wider text-text-dim mb-4">
-          {title}
-        </h3>
+    <div className={`relative ${className}`}>
+      <input
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        onChange={handleChange}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        aria-label="Upload file"
+      />
+      <div
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors hover:border-blue-400 ${
+          error ? "border-red" : "border-border"
+        }`}
+      >
+        {children || (
+          <div>
+            <div className="text-4xl mb-4">📄</div>
+            <p className="text-sm text-text-dim">
+              Click to upload or drag and drop
+            </p>
+            <p className="text-xs text-text-dim mt-1">
+              {accept ? `Accepted formats: ${accept}` : "Any file type"}
+            </p>
+          </div>
+        )}
+      </div>
+      {error && (
+        <p className="text-xs text-red mt-2" role="alert">
+          {error}
+        </p>
       )}
-      {children}
     </div>
   );
 }
+
+// ─── Enhanced Status Badge ───────────────────────────────────────────────────
 
 // ─── Legacy Card (for backward compatibility) ────────────────────────────────
 export function Card({
@@ -539,6 +600,34 @@ export function Card({
       >
         {title}
       </p>
+      {children}
+    </div>
+  );
+}
+
+export function EnhancedCard({
+  title,
+  children,
+  className = "",
+  interactive = false,
+}: {
+  title?: string;
+  children: ReactNode;
+  className?: string;
+  interactive?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-border bg-bg-card p-6 ${
+        interactive ? "card-interactive" : ""
+      } ${className}`}
+      style={{ boxShadow: "var(--shadow-md)" }}
+    >
+      {title && (
+        <div className="mb-5 flex items-center justify-between">
+          <p className="text-base font-semibold text-text">{title}</p>
+        </div>
+      )}
       {children}
     </div>
   );
@@ -588,16 +677,24 @@ export function EnhancedBadge({
     md: "px-2.5 py-1 text-sm",
   };
 
+  const showPulse = variant === "invoice" && value === "Issued";
+
   return (
     <span
-      className={`inline-flex items-center rounded-full font-medium ${sizeClasses[size]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full font-medium ${sizeClasses[size]}`}
       style={{
         color,
         background: bg,
         border: `1px solid ${color}33`,
-        boxShadow: `0 1px 2px ${color}20`,
+        boxShadow: `0 1px 3px ${color}18`,
       }}
     >
+      {showPulse && (
+        <span
+          className="pulse-dot shrink-0"
+          style={{ background: color }}
+        />
+      )}
       {label}
     </span>
   );

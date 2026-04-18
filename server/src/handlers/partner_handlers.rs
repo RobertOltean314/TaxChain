@@ -5,7 +5,33 @@ use validator::Validate;
 
 use crate::auth::middleware::require_role;
 use crate::models::{Partner, PartnerRequest, UserRole};
+use crate::models::entity_model::EntityContext;
 use crate::services::partner_service::DynPartnerRepository;
+
+fn extract_entity(req: &HttpRequest) -> Result<EntityContext, HttpResponse> {
+    let entity_type = req
+        .headers()
+        .get("X-Entity-Type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_uppercase())
+        .filter(|s| s == "PF" || s == "PJ")
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Type header"}))
+        })?;
+
+    let entity_id = req
+        .headers()
+        .get("X-Entity-Id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Id header"}))
+        })?;
+
+    Ok(EntityContext { entity_type, entity_id })
+}
 
 #[get("")]
 pub async fn find_all_partener(
@@ -28,7 +54,12 @@ pub async fn find_all_partener(
         }
     };
 
-    match repo.find_all_for_user(user_id).await {
+    let ctx = match extract_entity(&req) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+
+    match repo.find_all_for_entity(user_id, &ctx.entity_type, ctx.entity_id).await {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
             eprintln!("find_all_partener error: {e}");
@@ -98,7 +129,15 @@ pub async fn create_partener(
         }
     };
 
-    let partener = Partner::from_request(body.into_inner(), user_id);
+    let ctx = match extract_entity(&req) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    let (owner_pf_id, owner_pj_id) = match ctx.entity_type.as_str() {
+        "PF" => (Some(ctx.entity_id), None),
+        _ => (None, Some(ctx.entity_id)),
+    };
+    let partener = Partner::from_request(body.into_inner(), user_id, owner_pf_id, owner_pj_id);
 
     match repo.create(partener).await {
         Ok(created) => HttpResponse::Created().json(created),

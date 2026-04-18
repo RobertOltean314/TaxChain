@@ -134,9 +134,56 @@ export interface Partner {
   iban: string | null;
   persoana_fizica_id: string | null;
   persoana_juridica_id: string | null;
+  owner_pf_id: string | null;
+  owner_pj_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================================================
+// ENTITY MANAGEMENT
+// ============================================================================
+
+export interface EntitySummary {
+  /** accountant_entity.id — used to remove the link */
+  id: string;
+  entity_type: "PF" | "PJ";
+  /** The actual PF or PJ UUID */
+  entity_id: string;
+  /** PF: "Prenume Nume", PJ: denumire */
+  name: string;
+  /** PF: CNP, PJ: cod_fiscal */
+  fiscal_code: string;
+  created_at: string;
+}
+
+export interface BnrRate {
+  currency: string;
+  rate: string;
+  date: string;
+}
+
+// ============================================================================
+// REPORTS
+// ============================================================================
+
+export interface VatSummaryLine {
+  cota_tva: string;       // "Standard" | "Reduced9" | "Reduced5" | "Exempt"
+  tip_tranzactie: string; // "Venit" | "Cheltuiala" | "Necunoscut"
+  base: string;
+  vat: string;
+}
+
+export interface VatSummary {
+  lines: VatSummaryLine[];
+  income_base_total: string;
+  income_vat_total: string;
+  expense_base_total: string;
+  expense_vat_total: string;
+  net_vat: string;
+  from: string;
+  to: string;
 }
 
 // ============================================================================
@@ -162,11 +209,14 @@ export interface InvoiceLine {
   updated_at: string;
 }
 
+export type TransactionType = "Income" | "Expense";
+
 export interface Invoice {
   id: string;
   number: string;
   series: string | null;
   document_type: DocumentType;
+  transaction_type?: TransactionType; // New field for explicit income/expense classification
   status: InvoiceStatus;
   issued_date: string;
   due_date: string | null;

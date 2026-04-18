@@ -95,7 +95,7 @@ export const persoanaFizicaSchema = z.object({
     .refine(validateCNP, "CNP este invalid"),
   nume: z
     .string()
-    .min(1, "Nacvul este obligatoriu")
+    .min(1, "Numele este obligatoriu")
     .max(100, "Numele nu poate depăși 100 caractere"),
   prenume: z
     .string()
@@ -129,7 +129,10 @@ export const persoanaFizicaSchema = z.object({
   email: z.string().email("Email invalid").optional().nullable(),
   stare: z
     .enum(["Activ", "Inactiv", "Suspendat"])
-    .refine((v) => ["Activ", "Inactiv", "Suspendat"].includes(v), "Stare validă: Activ, Inactiv, Suspendat"),
+    .refine(
+      (v) => ["Activ", "Inactiv", "Suspendat"].includes(v),
+      "Stare validă: Activ, Inactiv, Suspendat",
+    ),
 });
 
 export type PersoanaFizicaFormValues = z.infer<typeof persoanaFizicaSchema>;
@@ -186,8 +189,10 @@ export const persoanaJuridicaSchema = z.object({
   capital_social: z.number().min(0, "Capitalul social nu poate fi negativ"),
   stare: z
     .enum(["Activa", "Radiata", "Suspendata", "InInsolventa"])
-    .refine((v) => ["Activa", "Radiata", "Suspendata", "InInsolventa"].includes(v), 
-      "Stare validă: Activa, Radiata, Suspendata, InInsolventa"),
+    .refine(
+      (v) => ["Activa", "Radiata", "Suspendata", "InInsolventa"].includes(v),
+      "Stare validă: Activa, Radiata, Suspendata, InInsolventa",
+    ),
 });
 
 export type PersoanaJuridicaFormValues = z.infer<typeof persoanaJuridicaSchema>;
@@ -213,11 +218,16 @@ export const partnerSchema = z.object({
     .nullable(),
   tip: z
     .enum(["Client", "Furnizor", "Ambele"])
-    .refine((v) => ["Client", "Furnizor", "Ambele"].includes(v), "Tip valid: Client, Furnizor, Ambele"),
+    .refine(
+      (v) => ["Client", "Furnizor", "Ambele"].includes(v),
+      "Tip valid: Client, Furnizor, Ambele",
+    ),
   tip_entitate: z
     .enum(["PersoanaFizica", "PersoanaJuridica"])
-    .refine((v) => ["PersoanaFizica", "PersoanaJuridica"].includes(v), 
-      "Tip entitate: PersoanaFizica sau PersoanaJuridica"),
+    .refine(
+      (v) => ["PersoanaFizica", "PersoanaJuridica"].includes(v),
+      "Tip entitate: PersoanaFizica sau PersoanaJuridica",
+    ),
   adresa: z
     .string()
     .min(5, "Adresa trebuie să aibă minim 5 caractere")
@@ -293,8 +303,10 @@ export const invoiceLineSchema = z.object({
     .default("0"),
   vat_rate: z
     .enum(["Standard", "Reduced9", "Reduced5", "Exempt"])
-    .refine((v) => ["Standard", "Reduced9", "Reduced5", "Exempt"].includes(v),
-      "Cota validă: Standard (19%), Reduced9 (9%), Reduced5 (5%), Exempt (0%)")
+    .refine(
+      (v) => ["Standard", "Reduced9", "Reduced5", "Exempt"].includes(v),
+      "Cota validă: Standard (19%), Reduced9 (9%), Reduced5 (5%), Exempt (0%)",
+    )
     .default("Standard"),
 });
 
@@ -314,16 +326,20 @@ export const invoiceSchema = z.object({
     .max(20, "Seria nu poate depăși 20 caractere")
     .default("FC"),
   document_type: z
-    .enum([
-      "TaxInvoice",
-      "Proforma",
-      "CreditNote",
-      "Receipt",
-      "DeliveryNote",
-    ])
-    .refine((v) => ["TaxInvoice", "Proforma", "CreditNote", "Receipt", "DeliveryNote"].includes(v),
-      "Tip document valid: TaxInvoice, Proforma, CreditNote, Receipt, DeliveryNote")
+    .enum(["TaxInvoice", "Proforma", "CreditNote", "Receipt", "DeliveryNote"])
+    .refine(
+      (v) =>
+        [
+          "TaxInvoice",
+          "Proforma",
+          "CreditNote",
+          "Receipt",
+          "DeliveryNote",
+        ].includes(v),
+      "Tip document valid: TaxInvoice, Proforma, CreditNote, Receipt, DeliveryNote",
+    )
     .default("TaxInvoice"),
+  transaction_type: z.enum(["Income", "Expense"]).optional().nullable(),
   issued_date: pastDateOrToday,
   due_date: z
     .string()
@@ -338,10 +354,7 @@ export const invoiceSchema = z.object({
   issuer_pf_id: z.string().uuid("ID invalid").optional().nullable(),
   issuer_pj_id: z.string().uuid("ID invalid").optional().nullable(),
   partner_id: z.string().uuid("Partenul este obligatoriu"),
-  currency: z
-    .string()
-    .length(3, "Moneda trebuie să aibă 3 caractere (e.g., RON, EUR)")
-    .default("RON"),
+  currency: z.enum(["RON", "EUR", "USD"]).default("RON"),
   notes: z
     .string()
     .max(1000, "Notele nu pot depăși 1000 caractere")
@@ -381,8 +394,35 @@ export type PaymentFormValues = z.infer<typeof paymentSchema>;
 export const statusChangeSchema = z.object({
   status: z
     .enum(["Draft", "Issued", "Sent", "Paid", "Cancelled"])
-    .refine((v) => ["Draft", "Issued", "Sent", "Paid", "Cancelled"].includes(v),
-      "Stare validă: Draft, Issued, Sent, Paid, Cancelled"),
+    .refine(
+      (v) => ["Draft", "Issued", "Sent", "Paid", "Cancelled"].includes(v),
+      "Stare validă: Draft, Issued, Sent, Paid, Cancelled",
+    ),
 });
 
 export type StatusChangeFormValues = z.infer<typeof statusChangeSchema>;
+
+// ============================================================================
+// TRIM HELPER — apply to form values before submitting to the API
+// Recursively trims all string values in a plain object.
+// ============================================================================
+
+type DeepTrim<T> = T extends string
+  ? string
+  : T extends (infer U)[]
+    ? DeepTrim<U>[]
+    : T extends object
+      ? { [K in keyof T]: DeepTrim<T[K]> }
+      : T;
+
+export function trimStrings<T>(obj: T): DeepTrim<T> {
+  if (typeof obj === "string") return obj.trim() as DeepTrim<T>;
+  if (Array.isArray(obj))
+    return obj.map(trimStrings) as DeepTrim<T>;
+  if (obj !== null && typeof obj === "object") {
+    return Object.fromEntries(
+      Object.entries(obj as object).map(([k, v]) => [k, trimStrings(v)]),
+    ) as DeepTrim<T>;
+  }
+  return obj as DeepTrim<T>;
+}

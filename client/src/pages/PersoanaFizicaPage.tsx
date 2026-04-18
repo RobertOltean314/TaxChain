@@ -71,7 +71,7 @@ export default function PersoanaFizicaPage() {
     <div className="p-8 fade-up">
       <PageHeader
         title="Persoane Fizice"
-        sub={`${filtered.length} înregistrări`}
+        subtitle={`${filtered.length} înregistrări`}
         action={
           isAdmin ? (
             <BtnPrimary onClick={() => navigate("/persoane-fizice/new")}>

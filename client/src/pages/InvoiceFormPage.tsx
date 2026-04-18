@@ -1,20 +1,27 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { invoiceSchema, type InvoiceFormValues } from "../validation";
+import {
+  invoiceSchema,
+  partnerSchema,
+  type InvoiceFormValues,
+  type PartnerFormValues,
+  trimStrings,
+} from "../validation";
 import { invoiceApi } from "../api/invoice.api";
 import { partnerApi } from "../api/partner.api";
 import { useToast } from "../components/ui/Toast";
 import { useAuth } from "../auth/useAuth";
+import { useEntity } from "../auth/useEntity";
 import { AppLayout } from "../components/ui/AppLayout";
-import { PageHeader, BtnPrimary, Spinner, Empty } from "../components/ui/ui";
+import { PageHeader, Button, Spinner } from "../components/ui/ui";
 import type { Partner, VatRate } from "../types";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const VAT_RATES: Record<VatRate, { label: string; mul: number }> = {
-  Standard: { label: "19%", mul: 0.19 },
+  Standard: { label: "21%", mul: 0.21 },
   Reduced9: { label: "9%", mul: 0.09 },
   Reduced5: { label: "5%", mul: 0.05 },
   Exempt: { label: "0% (scutit)", mul: 0 },
@@ -26,6 +33,17 @@ const DOC_TYPES = [
   { value: "CreditNote", label: "Notă de credit" },
   { value: "Receipt", label: "Chitanță" },
   { value: "DeliveryNote", label: "Aviz expediție" },
+];
+
+const TRANSACTION_TYPES = [
+  { value: "Income", label: "Venit" },
+  { value: "Expense", label: "Cheltuială" },
+];
+
+const CURRENCIES = [
+  { value: "RON", label: "RON — Leu românesc" },
+  { value: "EUR", label: "EUR — Euro" },
+  { value: "USD", label: "USD — Dolar american" },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -62,7 +80,7 @@ function calculateLine(
   return { subtotal, vat, total };
 }
 
-// ── Form Components ────────────────────────────────────────────────────────
+// ── Local form primitives ──────────────────────────────────────────────────
 
 interface FormFieldProps {
   label: string;
@@ -91,8 +109,7 @@ function FormField({ label, required, error, children }: FormFieldProps) {
   );
 }
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
-function Input(props: InputProps) {
+function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
@@ -129,6 +146,127 @@ function Select({ options, ...props }: SelectProps) {
   );
 }
 
+// ── Quick-create partner modal ─────────────────────────────────────────────
+
+interface QuickPartnerModalProps {
+  onCreated: (partner: Partner) => void;
+  onClose: () => void;
+}
+
+function QuickPartnerModal({ onCreated, onClose }: QuickPartnerModalProps) {
+  const { toast } = useToast();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<PartnerFormValues>({
+    resolver: zodResolver(partnerSchema),
+    defaultValues: {
+      tip: "Client" as const,
+      tip_entitate: "PersoanaJuridica" as const,
+      tara: "România",
+    },
+  });
+
+  const onSubmit = async (values: PartnerFormValues) => {
+    try {
+      const trimmed = trimStrings(values);
+      const partner = await partnerApi.create({
+        denumire: trimmed.denumire,
+        cod_fiscal: trimmed.cod_fiscal ?? undefined,
+        tip: trimmed.tip as import("../types").PartnerType,
+        tip_entitate: trimmed.tip_entitate as import("../types").EntityType,
+        tara: trimmed.tara,
+      });
+      onCreated(partner);
+      toast("Partener creat cu succes.", "ok");
+    } catch (e: any) {
+      toast(e?.response?.data?.error ?? "Eroare la creare partener.", "err");
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border p-6 shadow-xl"
+        style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+            Partener Nou
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm px-2 py-1 rounded"
+            style={{ color: "var(--text-dim)" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <FormField label="Denumire" required error={errors.denumire?.message}>
+            <Input
+              {...register("denumire")}
+              placeholder="Numele partenerului"
+              autoFocus
+            />
+          </FormField>
+
+          <FormField label="Cod Fiscal" error={errors.cod_fiscal?.message}>
+            <Input {...register("cod_fiscal")} placeholder="ex. RO12345678" />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Tip Partener" required error={errors.tip?.message}>
+              <Select
+                {...register("tip")}
+                options={[
+                  { value: "Client", label: "Client" },
+                  { value: "Furnizor", label: "Furnizor" },
+                  { value: "Ambele", label: "Client și Furnizor" },
+                ]}
+              />
+            </FormField>
+
+            <FormField
+              label="Tip Entitate"
+              required
+              error={errors.tip_entitate?.message}
+            >
+              <Select
+                {...register("tip_entitate")}
+                options={[
+                  { value: "PersoanaJuridica", label: "Persoană Juridică" },
+                  { value: "PersoanaFizica", label: "Persoană Fizică" },
+                ]}
+              />
+            </FormField>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button type="submit" variant="primary" loading={isSubmitting}>
+              Crează Partener
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Anulează
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export function InvoiceFormPage() {
@@ -137,10 +275,12 @@ export function InvoiceFormPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { activeEntity } = useEntity();
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loadingPartners, setLoadingPartners] = useState(true);
   const [nextNumber, setNextNumber] = useState<string | null>(null);
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
 
   const {
     register,
@@ -148,6 +288,7 @@ export function InvoiceFormPage() {
     watch,
     control,
     reset,
+    setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -181,7 +322,6 @@ export function InvoiceFormPage() {
   const watchLines = watch("lines");
   const watchSeries = watch("series");
 
-  // Load partners on mount
   useEffect(() => {
     (async () => {
       try {
@@ -195,7 +335,6 @@ export function InvoiceFormPage() {
     })();
   }, [toast]);
 
-  // Get next invoice number when series changes
   useEffect(() => {
     (async () => {
       try {
@@ -209,7 +348,6 @@ export function InvoiceFormPage() {
     })();
   }, [watchSeries]);
 
-  // Load existing invoice if editing
   useEffect(() => {
     if (!isEdit) {
       if (nextNumber) {
@@ -228,13 +366,14 @@ export function InvoiceFormPage() {
           number: invoice.number,
           series: invoice.series || "FC",
           document_type: invoice.document_type,
+          transaction_type: invoice.transaction_type || undefined,
           issued_date: invoice.issued_date,
           due_date: invoice.due_date || undefined,
           delivery_date: invoice.delivery_date || undefined,
           issuer_pf_id: invoice.issuer_pf_id || undefined,
           issuer_pj_id: invoice.issuer_pj_id || undefined,
           partner_id: invoice.partner_id,
-          currency: invoice.currency,
+          currency: invoice.currency as "RON" | "EUR" | "USD",
           notes: invoice.notes || undefined,
           payment_terms: invoice.payment_terms || undefined,
           lines: invoiceLines.map((l) => ({
@@ -256,21 +395,32 @@ export function InvoiceFormPage() {
 
   const onSubmit = async (values: InvoiceFormValues) => {
     try {
-      // Convert null values to undefined for API compatibility
-      const payload = {
-        ...values,
-        due_date: values.due_date || undefined,
-        delivery_date: values.delivery_date || undefined,
-        notes: values.notes || undefined,
-        payment_terms: values.payment_terms || undefined,
+      const trimmed = trimStrings(values);
+      const payload: Parameters<typeof invoiceApi.create>[0] = {
+        ...trimmed,
+        due_date: trimmed.due_date || undefined,
+        delivery_date: trimmed.delivery_date || undefined,
+        notes: trimmed.notes || undefined,
+        payment_terms: trimmed.payment_terms || undefined,
+        issuer_pf_id: activeEntity?.type === "PF" ? activeEntity.id : (trimmed.issuer_pf_id ?? undefined),
+        issuer_pj_id: activeEntity?.type === "PJ" ? activeEntity.id : (trimmed.issuer_pj_id ?? undefined),
+        transaction_type: (trimmed.transaction_type ?? undefined) as
+          | "Income"
+          | "Expense"
+          | undefined,
+        lines: trimmed.lines.map((l) => ({
+          ...l,
+          product_code: l.product_code ?? undefined,
+          vat_rate: l.vat_rate as "Standard" | "Reduced9" | "Reduced5" | "Exempt",
+        })),
       };
 
       if (isEdit) {
         await invoiceApi.update(id!, payload);
-        toast("Factură actualizată.", "ok");
+        toast("Factură actualizată cu succes.", "ok");
       } else {
         await invoiceApi.create(payload);
-        toast("Factură creată.", "ok");
+        toast("Factură creată cu succes.", "ok");
       }
       navigate("/invoices");
     } catch (e: any) {
@@ -280,7 +430,12 @@ export function InvoiceFormPage() {
     }
   };
 
-  // Calculate totals
+  const handlePartnerCreated = (partner: Partner) => {
+    setPartners((prev) => [...prev, partner]);
+    setValue("partner_id", partner.id, { shouldDirty: true });
+    setShowPartnerModal(false);
+  };
+
   const lineTotals = watchLines.map((line) =>
     calculateLine(
       line.quantity,
@@ -297,10 +452,17 @@ export function InvoiceFormPage() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-6xl mx-auto fade-up">
+      {showPartnerModal && (
+        <QuickPartnerModal
+          onCreated={handlePartnerCreated}
+          onClose={() => setShowPartnerModal(false)}
+        />
+      )}
+
+      <div className="w-full max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 fade-up">
         <PageHeader
           title={isEdit ? "Editare Factură" : "Factură Nouă"}
-          sub={isEdit ? `ID: ${id}` : undefined}
+          subtitle={isEdit ? `ID: ${id}` : undefined}
         />
 
         {loadingPartners || !nextNumber ? (
@@ -308,18 +470,47 @@ export function InvoiceFormPage() {
         ) : (
           <form
             onSubmit={handleSubmit(onSubmit)}
-            className="rounded-xl border p-8"
+            className="rounded-xl border p-6 sm:p-8"
             style={{
               background: "var(--bg-card)",
               borderColor: "var(--border)",
             }}
           >
+            {/* Active entity banner */}
+            {activeEntity && (
+              <div
+                className="flex items-center gap-3 rounded-lg px-4 py-3 mb-6"
+                style={{
+                  background: "color-mix(in srgb, var(--blue) 8%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--blue) 25%, transparent)",
+                }}
+              >
+                <span
+                  className="text-xs font-mono px-2 py-0.5 rounded-full font-medium shrink-0"
+                  style={{
+                    background: "color-mix(in srgb, var(--blue) 15%, transparent)",
+                    color: "var(--blue)",
+                  }}
+                >
+                  {activeEntity.type}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
+                    {activeEntity.name}
+                  </p>
+                  <p className="text-xs font-mono" style={{ color: "var(--text-dim)" }}>
+                    {activeEntity.type === "PF" ? "CNP" : "CIF"}: {activeEntity.fiscalCode}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Header Section */}
             <div
               className="mb-8 pb-8 border-b"
               style={{ borderColor: "var(--border)" }}
             >
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                 <FormField
                   label="Seria"
                   required
@@ -340,7 +531,7 @@ export function InvoiceFormPage() {
                 </FormField>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <FormField
                   label="Tip Document"
                   required
@@ -350,15 +541,28 @@ export function InvoiceFormPage() {
                 </FormField>
 
                 <FormField
+                  label="Tip Tranzacție"
+                  error={errors.transaction_type?.message}
+                >
+                  <Select
+                    {...register("transaction_type")}
+                    options={[
+                      { value: "", label: "--- Selectați tip ---" },
+                      ...TRANSACTION_TYPES,
+                    ]}
+                  />
+                </FormField>
+
+                <FormField
                   label="Monedă"
                   required
                   error={errors.currency?.message}
                 >
-                  <Input {...register("currency")} maxLength={3} />
+                  <Select {...register("currency")} options={CURRENCIES} />
                 </FormField>
               </div>
 
-              <div className="grid grid-cols-3 gap-6 mt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-6">
                 <FormField
                   label="Data Emisiei"
                   required
@@ -382,21 +586,39 @@ export function InvoiceFormPage() {
                 </FormField>
               </div>
 
+              {/* Partner select + quick-create */}
               <FormField
                 label="Partener"
                 required
                 error={errors.partner_id?.message}
               >
-                <Select
-                  {...register("partner_id")}
-                  options={[
-                    { value: "", label: "--- Selectați partener ---" },
-                    ...partners.map((p) => ({
-                      value: p.id,
-                      label: `${p.denumire}${p.cod_fiscal ? ` (${p.cod_fiscal})` : ""}`,
-                    })),
-                  ]}
-                />
+                <div className="flex gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Select
+                      {...register("partner_id")}
+                      options={[
+                        { value: "", label: "--- Selectați partener ---" },
+                        ...partners.map((p) => ({
+                          value: p.id,
+                          label: `${p.denumire}${p.cod_fiscal ? ` (${p.cod_fiscal})` : ""}`,
+                        })),
+                      ]}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPartnerModal(true)}
+                    disabled={isSubmitting || isReadOnly}
+                    className="shrink-0 px-3 py-2 text-sm rounded-lg border transition-colors disabled:opacity-50 whitespace-nowrap"
+                    style={{
+                      color: "var(--amber)",
+                      borderColor: "var(--amber-dim, var(--border))",
+                      background: "var(--bg-input)",
+                    }}
+                  >
+                    + Partener nou
+                  </button>
+                </div>
               </FormField>
             </div>
 
@@ -425,7 +647,7 @@ export function InvoiceFormPage() {
                   className="text-sm font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50"
                   style={{
                     color: "var(--amber)",
-                    borderColor: "var(--amber-dim)",
+                    borderColor: "var(--amber-dim, var(--border))",
                   }}
                 >
                   + Adaugă linie
@@ -436,7 +658,7 @@ export function InvoiceFormPage() {
                 className="overflow-x-auto mb-4 rounded-lg border"
                 style={{ borderColor: "var(--border)" }}
               >
-                <table className="w-full text-xs">
+                <table className="w-full text-xs" style={{ minWidth: "560px" }}>
                   <thead>
                     <tr
                       style={{
@@ -454,13 +676,13 @@ export function InvoiceFormPage() {
                         className="px-3 py-2 text-right"
                         style={{ color: "var(--text-dim)" }}
                       >
-                        Cantitate
+                        Cant.
                       </th>
                       <th
                         className="px-3 py-2 text-right"
                         style={{ color: "var(--text-dim)" }}
                       >
-                        Purețe
+                        Preț
                       </th>
                       <th
                         className="px-3 py-2 text-right"
@@ -472,7 +694,7 @@ export function InvoiceFormPage() {
                         className="px-3 py-2 text-center"
                         style={{ color: "var(--text-dim)" }}
                       >
-                        VAT
+                        TVA
                       </th>
                       <th
                         className="px-3 py-2 text-right"
@@ -480,7 +702,7 @@ export function InvoiceFormPage() {
                       >
                         Total
                       </th>
-                      <th className="px-3 py-2"></th>
+                      <th className="px-3 py-2" />
                     </tr>
                   </thead>
                   <tbody>
@@ -583,7 +805,7 @@ export function InvoiceFormPage() {
                     Subtotal
                   </p>
                   <p
-                    className="text-lg font-semibold"
+                    className="text-base sm:text-lg font-semibold truncate"
                     style={{ color: "var(--text)" }}
                   >
                     {formatDecimal(totalSubtotal)} {watch("currency")}
@@ -591,10 +813,10 @@ export function InvoiceFormPage() {
                 </div>
                 <div>
                   <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-                    VAT
+                    TVA
                   </p>
                   <p
-                    className="text-lg font-semibold"
+                    className="text-base sm:text-lg font-semibold truncate"
                     style={{ color: "var(--amber)" }}
                   >
                     {formatDecimal(totalVat)} {watch("currency")}
@@ -605,7 +827,7 @@ export function InvoiceFormPage() {
                     Total
                   </p>
                   <p
-                    className="text-lg font-semibold"
+                    className="text-base sm:text-lg font-semibold truncate"
                     style={{ color: "var(--green)" }}
                   >
                     {formatDecimal(totalAmount)} {watch("currency")}
@@ -634,16 +856,17 @@ export function InvoiceFormPage() {
 
             {/* Actions */}
             <div
-              className="flex items-center gap-3 mt-8 pt-6 border-t"
+              className="flex flex-wrap items-center gap-3 mt-8 pt-6 border-t"
               style={{ borderColor: "var(--border)" }}
             >
-              <BtnPrimary
+              <Button
                 type="submit"
+                variant="primary"
                 loading={isSubmitting}
                 disabled={!isDirty || isReadOnly}
               >
                 {isEdit ? "Actualizează" : "Crează"}
-              </BtnPrimary>
+              </Button>
               <button
                 type="button"
                 onClick={() => navigate("/invoices")}

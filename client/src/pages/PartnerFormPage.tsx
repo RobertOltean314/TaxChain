@@ -4,32 +4,8 @@ import { partnerApi, type PartnerPayload } from "../api/partner.api";
 import { AppLayout } from "../components/ui/AppLayout";
 import { useToast } from "../components/ui/Toast";
 import { useAuth } from "../auth/useAuth";
+import { FormField, Input, Select, Button } from "../components/ui/ui";
 import type { PartnerType, EntityType } from "../types";
-
-// ── Field wrapper ─────────────────────────────────────────────────────────────
-
-function Field({
-  label,
-  error,
-  required,
-  children,
-}: {
-  label: string;
-  error?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="input-label">
-        {label}
-        {required && <span className="text-danger ml-0.5">*</span>}
-      </label>
-      {children}
-      {error && <p className="input-error">{error}</p>}
-    </div>
-  );
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -143,7 +119,7 @@ export function PartnerFormPage() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-2xl">
+      <div className="w-full max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
@@ -170,57 +146,57 @@ export function PartnerFormPage() {
             <p className="text-xs text-slate-500 uppercase tracking-wider">
               Identificare
             </p>
-            <Field label="Denumire" error={errors.denumire} required>
-              <input
+            <FormField label="Denumire" error={errors.denumire} required>
+              <Input
                 value={denumire}
                 onChange={(e) => setDenumire(e.target.value)}
-                className="input-field"
                 placeholder="SC Exemplu SRL"
                 readOnly={isReadOnly}
+                error={!!errors.denumire}
               />
-            </Field>
+            </FormField>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Tip entitate">
-                <select
+              <FormField label="Tip entitate">
+                <Select
                   value={tipEntitate}
                   onChange={(e) => setTipEntitate(e.target.value as EntityType)}
-                  className="input-field"
                   disabled={isReadOnly}
-                >
-                  <option value="PersoanaJuridica">Persoană Juridică</option>
-                  <option value="PersoanaFizica">Persoană Fizică</option>
-                </select>
-              </Field>
-              <Field label="Relație">
-                <select
+                  options={[
+                    { value: "PersoanaJuridica", label: "Persoană Juridică" },
+                    { value: "PersoanaFizica", label: "Persoană Fizică" },
+                  ]}
+                />
+              </FormField>
+              <FormField label="Relație">
+                <Select
                   value={tip}
                   onChange={(e) => setTip(e.target.value as PartnerType)}
-                  className="input-field"
                   disabled={isReadOnly}
-                >
-                  <option value="Client">Client</option>
-                  <option value="Furnizor">Furnizor</option>
-                  <option value="Ambele">Client & Furnizor</option>
-                </select>
-              </Field>
-              <Field label="Cod Fiscal (CIF/CNP)">
-                <input
+                  options={[
+                    { value: "Client", label: "Client" },
+                    { value: "Furnizor", label: "Furnizor" },
+                    { value: "Ambele", label: "Client & Furnizor" },
+                  ]}
+                />
+              </FormField>
+              <FormField label="Cod Fiscal (CIF/CNP)">
+                <Input
                   value={codFiscal}
                   onChange={(e) => setCodFiscal(e.target.value)}
-                  className="input-field font-mono"
+                  className="font-mono"
                   placeholder="RO12345678"
                   readOnly={isReadOnly}
                 />
-              </Field>
-              <Field label="Nr. Registrul Comerțului">
-                <input
+              </FormField>
+              <FormField label="Nr. Registrul Comerțului">
+                <Input
                   value={nrRegCom}
                   onChange={(e) => setNrRegCom(e.target.value)}
-                  className="input-field font-mono"
+                  className="font-mono"
                   placeholder="J40/123/2020"
                   readOnly={isReadOnly}
                 />
-              </Field>
+              </FormField>
             </div>
           </div>
 
@@ -229,64 +205,60 @@ export function PartnerFormPage() {
             <p className="text-xs text-slate-500 uppercase tracking-wider">
               Contact & Adresă
             </p>
-            <Field label="Adresă">
-              <input
+            <FormField label="Adresă">
+              <Input
                 value={adresa}
                 onChange={(e) => setAdresa(e.target.value)}
-                className="input-field"
                 placeholder="Str. Exemplu, nr. 1"
                 readOnly={isReadOnly}
               />
-            </Field>
+            </FormField>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label="Oraș">
-                <input
+              <FormField label="Oraș">
+                <Input
                   value={oras}
                   onChange={(e) => setOras(e.target.value)}
-                  className="input-field"
                   placeholder="Cluj-Napoca"
                   readOnly={isReadOnly}
                 />
-              </Field>
-              <Field label="Cod poștal" error={errors.cod_postal}>
-                <input
+              </FormField>
+              <FormField label="Cod poștal" error={errors.cod_postal}>
+                <Input
                   value={codPostal}
                   onChange={(e) => setCodPostal(e.target.value)}
-                  className="input-field"
                   placeholder="400000"
                   maxLength={6}
                   readOnly={isReadOnly}
+                  error={!!errors.cod_postal}
                 />
-              </Field>
-              <Field label="Țară">
-                <input
+              </FormField>
+              <FormField label="Țară">
+                <Input
                   value={tara}
                   onChange={(e) => setTara(e.target.value)}
-                  className="input-field"
                   readOnly={isReadOnly}
                 />
-              </Field>
+              </FormField>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Email" error={errors.email}>
-                <input
+              <FormField label="Email" error={errors.email}>
+                <Input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   type="email"
-                  className="input-field"
                   placeholder="contact@firma.ro"
                   readOnly={isReadOnly}
+                  error={!!errors.email}
                 />
-              </Field>
-              <Field label="Telefon">
-                <input
+              </FormField>
+              <FormField label="Telefon">
+                <Input
                   value={telefon}
                   onChange={(e) => setTelefon(e.target.value)}
-                  className="input-field"
                   placeholder="+40212345678"
                   readOnly={isReadOnly}
                 />
-              </Field>
+              </FormField>
             </div>
           </div>
 
@@ -295,43 +267,35 @@ export function PartnerFormPage() {
             <p className="text-xs text-slate-500 uppercase tracking-wider mb-4">
               Financiar
             </p>
-            <Field label="IBAN">
-              <input
+            <FormField label="IBAN">
+              <Input
                 value={iban}
                 onChange={(e) => setIban(e.target.value)}
-                className="input-field font-mono"
+                className="font-mono"
                 placeholder="RO49AAAA1B31007593840000"
                 readOnly={isReadOnly}
               />
-            </Field>
+            </FormField>
           </div>
 
           {!isReadOnly && (
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 onClick={handleSubmit}
-                className="btn-primary"
+                loading={isSubmitting}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
-                    Se salvează...
-                  </span>
-                ) : isEdit ? (
-                  "Salvează modificările"
-                ) : (
-                  "Creează partenerul"
-                )}
-              </button>
-              <button
+                {isEdit ? "Salvează modificările" : "Creează partenerul"}
+              </Button>
+              <Button
                 type="button"
-                className="btn-secondary"
+                variant="secondary"
                 onClick={() => navigate("/partners")}
               >
                 Anulează
-              </button>
+              </Button>
             </div>
           )}
         </div>

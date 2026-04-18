@@ -70,7 +70,7 @@ export default function PersoanaJuridicaPage() {
     <div className="p-8 fade-up">
       <PageHeader
         title="Persoane Juridice"
-        sub={`${filtered.length} înregistrări`}
+        subtitle={`${filtered.length} înregistrări`}
         action={
           isAdmin ? (
             <BtnPrimary onClick={() => navigate("/persoane-juridice/new")}>

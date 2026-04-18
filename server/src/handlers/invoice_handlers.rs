@@ -8,7 +8,34 @@ use crate::auth::middleware::{AuthenticatedUser, require_role};
 use crate::models::{
     Invoice, InvoicePaymentRequest, InvoiceRequest, InvoiceStatus, InvoiceStatusRequest, UserRole,
 };
+use crate::models::entity_model::EntityContext;
 use crate::services::{invoice_service::DynInvoiceRepository, user_service::DynUserRepository};
+
+/// Extract `X-Entity-Type` and `X-Entity-Id` headers. Returns 400 if missing/invalid.
+fn extract_entity(req: &HttpRequest) -> Result<EntityContext, HttpResponse> {
+    let entity_type = req
+        .headers()
+        .get("X-Entity-Type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_uppercase())
+        .filter(|s| s == "PF" || s == "PJ")
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Type header (must be PF or PJ)"}))
+        })?;
+
+    let entity_id = req
+        .headers()
+        .get("X-Entity-Id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Id header (must be a UUID)"}))
+        })?;
+
+    Ok(EntityContext { entity_type, entity_id })
+}
 
 // ============================================================================
 // HELPER — extract authenticated user + user_id in one call
@@ -101,7 +128,12 @@ pub async fn find_all_invoices(
         Err(r) => return r,
     };
 
-    match repo.find_all_for_user(user_id).await {
+    let ctx = match extract_entity(&req) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+
+    match repo.find_all_for_entity(user_id, &ctx.entity_type, ctx.entity_id).await {
         Ok(list) => HttpResponse::Ok().json(list),
         Err(e) => {
             eprintln!("find_all_invoices error: {e}");
@@ -469,9 +501,9 @@ pub async fn delete_invoice(
             .json(json!({ "error": "Access denied — you can only delete your own invoices" }));
     }
 
-    if existing.status != InvoiceStatus::Draft {
+    if existing.status != InvoiceStatus::Draft && existing.status != InvoiceStatus::Paid {
         return HttpResponse::Conflict().json(json!({
-            "error": "Only Draft invoices can be deleted",
+            "error": "Only Draft or Paid invoices can be deleted",
             "current_status": format!("{:?}", existing.status)
         }));
     }

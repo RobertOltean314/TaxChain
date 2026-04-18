@@ -1,5 +1,8 @@
 pub mod auth_handlers;
+pub mod bnr_handlers;
+pub mod report_handlers;
 pub mod efactura_handlers;
+pub mod entity_handlers;
 pub mod invoice_handlers;
 pub mod partner_handlers;
 pub mod persoana_fizica_handlers;

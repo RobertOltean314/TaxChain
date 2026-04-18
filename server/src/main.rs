@@ -11,11 +11,14 @@ use taxchain::{
             AuthConfig, google_login_handler, link_entity_handler, logout, refresh_token_handler,
             wallet_nonce_handler, wallet_verify_handler,
         },
+        bnr_handlers::get_bnr_rate,
+        report_handlers::get_vat_summary,
         create_persoana_fizica, create_persoana_juridica, delete_persoana_fizica,
         delete_persoana_juridica,
         efactura_handlers::{
             generate_invoice_xml, get_efactura_by_cif, get_efactura_status, submit_efactura,
         },
+        entity_handlers::{add_entity, list_my_entities, remove_entity},
         find_all_persoana_fizica, find_all_persoana_juridica, get_persoana_fizica_by_id,
         invoice_handlers::{
             create_invoice, delete_invoice, find_all_invoices, get_invoice_by_id,
@@ -29,7 +32,10 @@ use taxchain::{
         update_persoana_fizica, update_persoana_juridica,
     },
     services::{
+        bnr_service::{BnrService, DynBnrService},
+        report_service::{DynReportService, ReportService},
         e_factura_service::{DynEFacturaRepository, PgEFacturaRepository},
+        entity_service::{DynEntityRepository, PgEntityRepository},
         invoice_service::{DynInvoiceRepository, PgInvoiceRepository},
         partner_service::{DynPartnerRepository, PgPartnerRepository},
         persoana_fizica_service::{DynPersoanaFizicaRepository, PgPersoanaFizicaRepository},
@@ -54,6 +60,63 @@ async fn main() -> std::io::Result<()> {
         .await
         .map_err(|e| io_error(&format!("Failed to connect to the database: {e}")))?;
 
+    // Ensure the invoice transaction type enum and column exist for older databases.
+    // Use compatibility-safe SQL instead of `CREATE TYPE IF NOT EXISTS`.
+    sqlx::query(
+        r#"
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_type WHERE typname = 'tip_tranzactie'
+            ) THEN
+                CREATE TYPE tip_tranzactie AS ENUM ('Venit', 'Cheltuiala');
+            END IF;
+        END$$;
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| io_error(&format!("Failed to create tip_tranzactie type: {e}")))?;
+
+    sqlx::query(
+        r#"
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'factura'
+                  AND column_name = 'tip_tranzactie'
+            ) THEN
+                ALTER TABLE factura
+                ADD COLUMN tip_tranzactie tip_tranzactie;
+            END IF;
+        END$$;
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| io_error(&format!("Failed to add tip_tranzactie column: {e}")))?;
+
+    // Clear the BNR rate cache so any rates stored with the old buggy parser
+    // (which divided non-multiplier currencies by 100) are discarded and
+    // re-fetched correctly on the next request. The table is purely a cache
+    // so truncating it on startup is safe.
+    sqlx::query("TRUNCATE TABLE curs_valutar")
+        .execute(&pool)
+        .await
+        .map_err(|e| io_error(&format!("Failed to clear BNR rate cache: {e}")))?;
+
+    let http_client = Client::new();
+
+    // BNR's SSL certificate is occasionally expired; use a dedicated client
+    // that skips verification only for this service.
+    let bnr_http_client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| io_error(&format!("Failed to build BNR HTTP client: {e}")))?;
+
     let pf_repo: DynPersoanaFizicaRepository =
         Arc::new(PgPersoanaFizicaRepository::new(pool.clone()));
     let pj_repo: DynPersoanaJuridicaRepository =
@@ -62,6 +125,10 @@ async fn main() -> std::io::Result<()> {
     let partener_repo: DynPartnerRepository = Arc::new(PgPartnerRepository::new(pool.clone()));
     let invoice_repo: DynInvoiceRepository = Arc::new(PgInvoiceRepository::new(pool.clone()));
     let efactura_repo: DynEFacturaRepository = Arc::new(PgEFacturaRepository::new(pool.clone()));
+    let entity_repo: DynEntityRepository = Arc::new(PgEntityRepository::new(pool.clone()));
+    let bnr_service: DynBnrService =
+        Arc::new(BnrService::new(pool.clone(), bnr_http_client));
+    let report_service: DynReportService = Arc::new(ReportService::new(pool.clone()));
 
     let auth_config = AuthConfig {
         jwt_secret,
@@ -70,13 +137,16 @@ async fn main() -> std::io::Result<()> {
         google_client_id,
     };
 
-    let http_client = Client::new();
-
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://localhost:5173") // Vite dev server
             .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-            .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE])
+            .allowed_headers(vec![
+                header::AUTHORIZATION,
+                header::CONTENT_TYPE,
+                header::HeaderName::from_static("x-entity-type"),
+                header::HeaderName::from_static("x-entity-id"),
+            ])
             .max_age(3600);
 
         App::new()
@@ -89,6 +159,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(partener_repo.clone()))
             .app_data(web::Data::new(invoice_repo.clone()))
             .app_data(web::Data::new(efactura_repo.clone()))
+            .app_data(web::Data::new(entity_repo.clone()))
+            .app_data(web::Data::new(bnr_service.clone()))
+            .app_data(web::Data::new(report_service.clone()))
             // ── Auth (public) ──────────────────────────────────────────────
             .service(
                 web::scope("/auth")
@@ -155,6 +228,22 @@ async fn main() -> std::io::Result<()> {
                     .service(get_efactura_status)
                     .service(get_efactura_by_cif)
                     .service(generate_invoice_xml),
+            )
+            // ── Entitate (accountant → managed entities) ───────────────────
+            .service(
+                web::scope("/entitate")
+                    .wrap(JwtAuthMiddleware)
+                    .service(list_my_entities)
+                    .service(add_entity)
+                    .service(remove_entity),
+            )
+            // ── Curs BNR (public — no auth needed) ────────────────────────
+            .service(web::scope("/curs-bnr").service(get_bnr_rate))
+            // ── Reports (JWT-protected) ────────────────────────────────────
+            .service(
+                web::scope("/reports")
+                    .wrap(JwtAuthMiddleware)
+                    .service(get_vat_summary),
             )
     })
     .bind("0.0.0.0:8080")?

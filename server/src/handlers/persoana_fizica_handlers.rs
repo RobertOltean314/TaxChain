@@ -13,7 +13,7 @@ pub async fn find_all_persoana_fizica(
     req: HttpRequest,
     repo: web::Data<DynPersoanaFizicaRepository>,
 ) -> impl Responder {
-    if let Err(resp) = require_role(&req, &[UserRole::Admin, UserRole::Auditor]) {
+    if let Err(resp) = require_role(&req, &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer]) {
         return resp;
     }
 

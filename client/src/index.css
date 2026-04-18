@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Design tokens ─────────────────────────────────────────────────── */
+/* ─── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
   --bg: #ffffff;
   --bg-card: #f8f9fa;
@@ -30,6 +30,22 @@
   --orange-bg: #fed7aa;
   --brand: var(--blue);
   --brand-bg: var(--blue-bg);
+
+  /* ── Motion tokens ─────────────────────────────────────────────────────── */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-circ: cubic-bezier(0, 0.55, 0.45, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-press: 80ms;
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 380ms;
+
+  /* ── Shadow system ──────────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.10), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 24px 56px rgba(0, 0, 0, 0.13), 0 8px 20px rgba(0, 0, 0, 0.06);
 }
 
 body.theme-dark {
@@ -47,6 +63,10 @@ body.theme-dark {
   --blue-bg: #1d4ed8;
   --green: #4ade80;
   --red: #f87171;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover: 0 24px 56px rgba(0, 0, 0, 0.55), 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
 body.theme-light {
@@ -78,6 +98,7 @@ body.theme-dark .text-slate-400 {
   color: var(--text-dim) !important;
 }
 
+/* ─── Base ───────────────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
 }
@@ -97,6 +118,7 @@ body {
   font-family: "Playfair Display", serif;
 }
 
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -109,65 +131,179 @@ body {
   border-radius: 3px;
 }
 
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ─── Focus ring ─────────────────────────────────────────────────────────────── */
+/* Remove default outlines and replace with a clean ring */
+*:focus {
+  outline: none;
 }
-.fade-up {
-  animation: fadeUp 0.22s ease both;
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.45);
+  border-radius: 8px;
+}
+
+/* ─── Keyframes ──────────────────────────────────────────────────────────────── */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.fade-in {
-  animation: fadeIn 0.18s ease both;
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-/* Custom surface and card utilities */
-.bg-surface {
-  background: var(--bg);
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-.bg-surface-raised {
-  background: var(--bg-card);
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
 }
-.bg-surface-border {
-  background: var(--border);
+
+/* Modal — slides up + fades in, spring feel */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-.border-surface-border {
-  border-color: var(--border);
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-.text-danger {
-  color: var(--red);
+
+/* Skeleton shimmer — moves left to right */
+@keyframes shimmer {
+  0%   { background-position: -400% 0; }
+  100% { background-position: 400% 0; }
 }
-.bg-danger-5 {
-  background: rgba(229, 62, 62, 0.05);
+
+/* Status pulse — breathes for live states */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.82); }
 }
+
+/* Count-up — just makes the number pop in */
+@keyframes numberIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Subtle spin for loading */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Animation utility classes ──────────────────────────────────────────────── */
+.fade-up  { animation: fadeUp  var(--duration-base) var(--ease-out-expo) both; }
+.fade-in  { animation: fadeIn  var(--duration-fast) ease both; }
+.scale-in { animation: scaleIn var(--duration-fast) var(--ease-out-expo) both; }
+.slide-in { animation: slideInLeft var(--duration-base) var(--ease-out-expo) both; }
+
+.modal-backdrop { animation: backdropIn var(--duration-fast) ease both; }
+.modal-content  { animation: modalIn var(--duration-base) var(--ease-spring) both; }
+
+.number-in { animation: numberIn var(--duration-base) var(--ease-out-expo) both; }
+
+/* ─── Stagger — children appear in sequence ─────────────────────────────────── */
+/* Apply .stagger to a container and .fade-up / .slide-in to each child */
+.stagger > *:nth-child(1)  { animation-delay:   0ms; }
+.stagger > *:nth-child(2)  { animation-delay:  55ms; }
+.stagger > *:nth-child(3)  { animation-delay: 110ms; }
+.stagger > *:nth-child(4)  { animation-delay: 165ms; }
+.stagger > *:nth-child(5)  { animation-delay: 220ms; }
+.stagger > *:nth-child(6)  { animation-delay: 275ms; }
+.stagger > *:nth-child(7)  { animation-delay: 330ms; }
+.stagger > *:nth-child(8)  { animation-delay: 385ms; }
+.stagger > *:nth-child(9)  { animation-delay: 440ms; }
+.stagger > *:nth-child(10) { animation-delay: 495ms; }
+
+/* Table row stagger */
+.row-stagger tr {
+  animation: fadeUp var(--duration-base) var(--ease-out-expo) both;
+}
+.row-stagger tr:nth-child(1)  { animation-delay:   0ms; }
+.row-stagger tr:nth-child(2)  { animation-delay:  35ms; }
+.row-stagger tr:nth-child(3)  { animation-delay:  70ms; }
+.row-stagger tr:nth-child(4)  { animation-delay: 105ms; }
+.row-stagger tr:nth-child(5)  { animation-delay: 140ms; }
+.row-stagger tr:nth-child(6)  { animation-delay: 175ms; }
+.row-stagger tr:nth-child(7)  { animation-delay: 210ms; }
+.row-stagger tr:nth-child(8)  { animation-delay: 245ms; }
+.row-stagger tr:nth-child(9)  { animation-delay: 280ms; }
+.row-stagger tr:nth-child(10) { animation-delay: 315ms; }
+
+/* ─── Interactive press feedback ─────────────────────────────────────────────── */
+/* Makes every button feel physical — immediate, proportional */
+button {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform var(--duration-press) ease !important;
+}
+
+/* Link buttons (anchor styled as button) also get press */
+a[class*="btn"]:active {
+  transform: scale(0.97);
+  transition: transform var(--duration-press) ease !important;
+}
+
+/* ─── Card ───────────────────────────────────────────────────────────────────── */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 1rem;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
-}
-.badge {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 9999px;
-  padding: 0.35rem 0.875rem;
-  font-size: 0.75rem;
+  box-shadow: var(--shadow-sm);
 }
 
+/* Interactive card — lifts on hover */
+.card-interactive {
+  transition:
+    transform var(--duration-base) var(--ease-out-expo),
+    box-shadow var(--duration-base) ease,
+    border-color var(--duration-base) ease;
+  cursor: pointer;
+  will-change: transform;
+}
+.card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-hi);
+}
+.card-interactive:active {
+  transform: translateY(-1px) scale(0.99);
+  transition-duration: var(--duration-press) !important;
+}
+
+/* ─── Skeleton shimmer ───────────────────────────────────────────────────────── */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-raised) 0%,
+    var(--border-hi) 50%,
+    var(--bg-raised) 100%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* ─── Status pulse dot ───────────────────────────────────────────────────────── */
+.pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+/* ─── Input / Select / Textarea ──────────────────────────────────────────────── */
 input,
 select,
 textarea {
@@ -176,8 +312,9 @@ textarea {
   background: var(--bg-input);
   color: var(--text);
   transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
 }
 
 input:focus,
@@ -185,74 +322,192 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--blue);
-  box-shadow: 0 0 0 4px rgba(49, 130, 206, 0.14);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.25);
 }
 
-button:hover {
-  cursor: pointer;
+input:hover:not(:focus),
+select:hover:not(:focus),
+textarea:hover:not(:focus) {
+  border-color: var(--border-hi);
 }
 
-/* ─── Enhanced Animations & Transitions ─────────────────────────────────────── */
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+/* ─── Badge ──────────────────────────────────────────────────────────────────── */
+.badge {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.slide-in {
-  animation: slideIn 0.2s ease-out;
-}
-
-.scale-in {
-  animation: scaleIn 0.15s ease-out;
-}
-
-/* Enhanced hover states */
-.btn-hover-lift {
+/* ─── Legacy button classes ─────────────────────────────────────────────────── */
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    transform var(--duration-base) var(--ease-spring);
 }
 
-.btn-hover-lift:hover {
+.btn-primary {
+  color: #ffffff;
+  background: var(--blue);
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(96, 165, 250, 0.25);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+  box-shadow: 0 4px 16px rgba(96, 165, 250, 0.35);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Loading shimmer */
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+.btn-secondary {
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-hi);
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+.btn-danger {
+  color: #ffffff;
+  background: var(--red);
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(248, 113, 113, 0.2);
 }
+.btn-danger:hover:not(:disabled) {
+  background: #c53030;
+  box-shadow: 0 4px 14px rgba(248, 113, 113, 0.35);
+}
+
+.btn-ghost {
+  color: var(--text-sub);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* ─── Input field (form pages) ───────────────────────────────────────────────── */
+.input-field {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 0.925rem;
+  transition:
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.22);
+}
+.input-field:hover:not(:focus) {
+  border-color: var(--border-hi);
+}
+.input-field[aria-invalid="true"] {
+  border-color: var(--red);
+  background: rgba(248, 113, 113, 0.05);
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-sub);
+}
+.input-error {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--red);
+}
+
+/* ─── Sidebar / Navigation ───────────────────────────────────────────────────── */
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+  text-decoration: none;
+}
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.nav-item.active {
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--blue);
+}
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 25%;
+  height: 50%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--blue);
+}
+.nav-item .nav-icon {
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+.nav-item:hover .nav-icon {
+  transform: scale(1.15);
+}
+
+/* ─── Misc surface utilities ─────────────────────────────────────────────────── */
+.bg-surface         { background: var(--bg); }
+.bg-surface-raised  { background: var(--bg-card); }
+.bg-surface-border  { background: var(--border); }
+.border-surface-border { border-color: var(--border); }
+.text-danger        { color: var(--red); }
+.text-success       { color: var(--green); }
+.text-warning       { color: var(--amber); }
+.text-brand         { color: var(--blue); }
+.text-accent        { color: var(--violet); }
+.bg-danger-5        { background: rgba(229, 62, 62, 0.05); }
+.bg-brand           { background: var(--blue); }
+
+.form-status {
+  border-radius: 0.75rem;
+  padding: 1rem 1.1rem;
+  background: rgba(249, 115, 22, 0.08);
+  color: var(--amber-dim);
+  border: 1px solid rgba(245, 158, 11, 0.24);
+}
+
+/* Legacy badge variants */
+.badge-activ   { background: rgba(74, 222, 128, 0.12);  color: #4ade80; border-color: rgba(74, 222, 128, 0.25); }
+.badge-radiata { background: rgba(248, 113, 113, 0.12); color: #f87171; border-color: rgba(248, 113, 113, 0.25); }

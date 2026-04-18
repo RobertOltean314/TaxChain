@@ -4,7 +4,13 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { pjGetById, pjCreate, pjUpdate } from "../api/persoanaJuridica.api";
 import { useToast } from "../components/ui/Toast";
 import { AppLayout } from "../components/ui/AppLayout";
-import { PageHeader, BtnPrimary } from "../components/ui/ui";
+import {
+  PageHeader,
+  FormField,
+  Input,
+  Select,
+  Button,
+} from "../components/ui/ui";
 
 type F = {
   cod_fiscal: string;
@@ -23,77 +29,6 @@ type F = {
   capital_social: number;
   stare: "Activa" | "Radiata" | "Suspendata" | "InInsolventa";
 };
-
-// ── Form Field ─────────────────────────────────────────────────────────────
-
-interface FormFieldProps {
-  label: string;
-  required?: boolean;
-  error?: string;
-  children: React.ReactNode;
-}
-
-function FormField({ label, required, error, children }: FormFieldProps) {
-  return (
-    <div className="mb-4">
-      <label
-        className="block text-sm font-medium mb-1"
-        style={{ color: "var(--text)" }}
-      >
-        {label}
-        {required && <span style={{ color: "var(--red)" }}>*</span>}
-      </label>
-      {children}
-      {error && (
-        <p className="text-xs mt-0.5" style={{ color: "var(--red)" }}>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ── Input & Select Components ──────────────────────────────────────────────
-
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
-
-function Input(props: InputProps) {
-  return (
-    <input
-      {...props}
-      className="w-full px-3 py-2 rounded-lg border text-sm"
-      style={{
-        background: "var(--bg-input)",
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
-    />
-  );
-}
-
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  options: { value: string; label: string }[];
-}
-
-function Select({ options, ...props }: SelectProps) {
-  return (
-    <select
-      {...props}
-      className="w-full px-3 py-2 rounded-lg border text-sm"
-      style={{
-        background: "var(--bg-input)",
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 export default function PersoanaJuridicaFormPage() {
   const navigate = useNavigate();
@@ -199,7 +134,7 @@ export default function PersoanaJuridicaFormPage() {
           title={
             isEdit ? "Editare Persoană Juridică" : "Adaugare Persoană Juridică"
           }
-          sub={isEdit ? `ID: ${id}` : undefined}
+          subtitle={isEdit ? `ID: ${id}` : undefined}
         />
 
         <form
@@ -228,6 +163,7 @@ export default function PersoanaJuridicaFormPage() {
                 <Input
                   {...register("cod_fiscal", { required: "Obligatoriu" })}
                   placeholder="RO12345678"
+                  error={!!errors.cod_fiscal}
                 />
               </FormField>
 
@@ -246,6 +182,7 @@ export default function PersoanaJuridicaFormPage() {
                     },
                   )}
                   placeholder="J40/1234/2020"
+                  error={!!errors.numar_de_inregistrare_in_registrul_comertului}
                 />
               </FormField>
             </div>
@@ -258,6 +195,7 @@ export default function PersoanaJuridicaFormPage() {
               <Input
                 {...register("denumire", { required: "Obligatoriu" })}
                 placeholder="S.R.L. Example Company"
+                error={!!errors.denumire}
               />
             </FormField>
 
@@ -273,6 +211,7 @@ export default function PersoanaJuridicaFormPage() {
                     valueAsNumber: true,
                     required: "Obligatoriu",
                   })}
+                  error={!!errors.an_infiintare}
                 />
               </FormField>
 
@@ -312,6 +251,7 @@ export default function PersoanaJuridicaFormPage() {
                   required: "Obligatoriu",
                 })}
                 placeholder="Str. Principale, nr. 123"
+                error={!!errors.adresa_sediu_social}
               />
             </FormField>
 
@@ -321,6 +261,7 @@ export default function PersoanaJuridicaFormPage() {
                   {...register("cod_postal")}
                   placeholder="012345"
                   maxLength={6}
+                  error={!!errors.cod_postal}
                 />
               </FormField>
 
@@ -329,6 +270,7 @@ export default function PersoanaJuridicaFormPage() {
                   {...register("telefon")}
                   placeholder="+40 700 000 000"
                   type="tel"
+                  error={!!errors.telefon}
                 />
               </FormField>
             </div>
@@ -338,6 +280,7 @@ export default function PersoanaJuridicaFormPage() {
                 type="email"
                 {...register("email")}
                 placeholder="contact@example.com"
+                error={!!errors.email}
               />
             </FormField>
 
@@ -345,7 +288,8 @@ export default function PersoanaJuridicaFormPage() {
               <Input
                 {...register("iban", { required: "Obligatoriu" })}
                 placeholder="ROXX XXXX XXXX XXXX XXXX XXXX"
-                style={{ fontFamily: "monospace", letterSpacing: "0.05em" }}
+                className="font-mono"
+                error={!!errors.iban}
               />
             </FormField>
 
@@ -475,6 +419,7 @@ export default function PersoanaJuridicaFormPage() {
                   type="number"
                   min={0}
                   {...register("numar_angajati", { valueAsNumber: true })}
+                  error={!!errors.numar_angajati}
                 />
               </FormField>
 
@@ -488,6 +433,7 @@ export default function PersoanaJuridicaFormPage() {
                   step="0.01"
                   min="1"
                   {...register("capital_social", { valueAsNumber: true })}
+                  error={!!errors.capital_social}
                 />
               </FormField>
             </div>
@@ -498,25 +444,22 @@ export default function PersoanaJuridicaFormPage() {
             className="flex items-center gap-3 pt-6 border-t"
             style={{ borderColor: "var(--border)" }}
           >
-            <BtnPrimary
+            <Button
               type="submit"
+              variant="primary"
               loading={isSubmitting}
               disabled={!isDirty}
             >
               {isEdit ? "Actualizează" : "Crează"}
-            </BtnPrimary>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => navigate("/persoane-juridice")}
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm rounded-lg border transition-colors disabled:opacity-50"
-              style={{
-                color: "var(--text-sub)",
-                borderColor: "var(--border)",
-              }}
             >
               Anulează
-            </button>
+            </Button>
           </div>
         </form>
       </div>

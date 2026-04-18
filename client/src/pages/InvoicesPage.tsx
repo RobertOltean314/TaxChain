@@ -15,12 +15,14 @@ import {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatRON(amount: string) {
+function formatMoney(amount: string, currency = "RON") {
   const n = parseFloat(amount);
   if (isNaN(n)) return "—";
   return new Intl.NumberFormat("ro-RO", {
     style: "currency",
-    currency: "RON",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
 }
 
@@ -91,64 +93,88 @@ export function InvoicesPage() {
 
   return (
     <AppLayout>
-      <div className="p-8">
+      <div className="w-full max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-start justify-between gap-4 mb-8 fade-up flex-wrap">
           <div>
-            <h1 className="font-display text-2xl text-white mb-1">Facturi</h1>
-            <p className="text-sm text-slate-400">
+            <h1
+              className="font-display text-2xl font-bold"
+              style={{ color: "var(--text)" }}
+            >
+              Facturi
+            </h1>
+            <p className="text-sm mt-1" style={{ color: "var(--text-dim)" }}>
               {filtered.length} înregistrări
             </p>
           </div>
           {canEdit && (
-            <Link to="/invoices/new" className="btn-primary">
-              + Factură nouă
-            </Link>
+            <div className="flex gap-3 flex-wrap">
+              <Link to="/invoices/upload" className="btn-secondary">
+                Încarcă factură
+              </Link>
+              <Link to="/invoices/new" className="btn-primary">
+                + Factură nouă
+              </Link>
+            </div>
           )}
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-5">
+        <div
+          className="flex flex-wrap gap-3 mb-5 fade-up"
+          style={{ animationDelay: "60ms" }}
+        >
           <input
             type="text"
             placeholder="Caută după număr, serie..."
-            className="input-field max-w-xs"
+            className="input"
+            style={{ maxWidth: "18rem" }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="flex gap-1 flex-wrap">
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                statusFilter === "all"
-                  ? "bg-brand text-white"
-                  : "bg-surface-raised text-slate-400 border border-surface-border hover:text-white"
-              }`}
-            >
-              Toate
-            </button>
-            {ALL_STATUSES.map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  statusFilter === s
-                    ? "bg-brand text-white"
-                    : "bg-surface-raised text-slate-400 border border-surface-border hover:text-white"
-                }`}
-              >
-                {STATUS_LABELS[s]}
-              </button>
-            ))}
+            {(["all", ...ALL_STATUSES] as const).map((s) => {
+              const isActive = statusFilter === s;
+              const label = s === "all" ? "Toate" : STATUS_LABELS[s];
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150"
+                  style={
+                    isActive
+                      ? {
+                          background: "var(--blue)",
+                          color: "#fff",
+                          boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                        }
+                      : {
+                          background: "var(--bg-card)",
+                          color: "var(--text-dim)",
+                          border: "1px solid var(--border)",
+                        }
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Table */}
-        <div className="card overflow-hidden">
+        <div
+          className="card overflow-hidden fade-up"
+          style={{
+            animationDelay: "120ms",
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm" style={{ minWidth: "640px" }}>
               <thead>
-                <tr className="border-b border-surface-border">
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
                   {[
                     "Număr",
                     "Data emiterii",
@@ -161,7 +187,8 @@ export function InvoicesPage() {
                   ].map((h) => (
                     <th
                       key={h}
-                      className="text-left text-xs text-slate-500 uppercase tracking-wider px-4 py-3 font-medium"
+                      className="text-left text-xs font-mono uppercase tracking-wider px-4 py-3 font-medium"
+                      style={{ color: "var(--text-dim)" }}
                     >
                       {h}
                     </th>
@@ -171,10 +198,13 @@ export function InvoicesPage() {
               <tbody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b border-surface-border/50">
+                    <tr
+                      key={i}
+                      style={{ borderBottom: "1px solid var(--border)" }}
+                    >
                       {Array.from({ length: 8 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
-                          <div className="h-4 bg-surface-border rounded animate-pulse" />
+                          <div className="h-4 rounded shimmer" />
                         </td>
                       ))}
                     </tr>
@@ -183,64 +213,92 @@ export function InvoicesPage() {
                   <tr>
                     <td
                       colSpan={8}
-                      className="px-4 py-12 text-center text-slate-500"
+                      className="px-4 py-12 text-center text-sm"
+                      style={{ color: "var(--text-dim)" }}
                     >
                       {search || statusFilter !== "all"
-                        ? "Nicio factură corespunzătoare"
+                        ? "Nicio factură corespunzătoare filtrelor selectate."
                         : "Nicio factură încă. Creează prima factură!"}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((inv) => (
+                  filtered.map((inv, i) => (
                     <tr
                       key={inv.id}
                       onClick={() => navigate(`/invoices/${inv.id}`)}
-                      className="border-b border-surface-border/50 hover:bg-white/[0.02] cursor-pointer transition-colors"
+                      className="cursor-pointer transition-colors fade-up"
+                      style={{
+                        borderBottom: "1px solid var(--border)",
+                        animationDelay: `${i * 35}ms`,
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "var(--bg-hover)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "")
+                      }
                     >
                       <td className="px-4 py-3">
-                        <span className="font-mono text-white text-xs">
+                        <span
+                          className="font-mono text-xs font-semibold"
+                          style={{ color: "var(--text)" }}
+                        >
                           {inv.number}
                         </span>
                         {inv.series && (
-                          <span className="ml-1.5 text-[10px] text-slate-500">
+                          <span
+                            className="ml-1.5 text-[10px]"
+                            style={{ color: "var(--text-dim)" }}
+                          >
                             {inv.series}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-400 text-xs">
-                        {inv.issued_date}
+                      <td
+                        className="px-4 py-3 text-xs"
+                        style={{ color: "var(--text-dim)" }}
+                      >
+                        {new Date(inv.issued_date).toLocaleDateString("ro-RO")}
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {inv.due_date ? (
                           <span
-                            className={
-                              isOverdue(inv)
-                                ? "text-danger font-medium"
-                                : "text-slate-400"
-                            }
+                            style={{
+                              color: isOverdue(inv)
+                                ? "var(--red)"
+                                : "var(--text-dim)",
+                              fontWeight: isOverdue(inv) ? 600 : undefined,
+                            }}
                           >
-                            {inv.due_date}
+                            {new Date(inv.due_date).toLocaleDateString("ro-RO")}
                             {isOverdue(inv) && " ⚠"}
                           </span>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span style={{ color: "var(--text-dim)" }}>—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono text-slate-300 text-xs">
-                        {formatRON(inv.total)}
+                      <td
+                        className="px-4 py-3 font-mono text-xs"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {formatMoney(inv.total, inv.currency)}
                       </td>
-                      <td className="px-4 py-3 font-mono text-success text-xs">
-                        {formatRON(inv.amount_paid)}
+                      <td
+                        className="px-4 py-3 font-mono text-xs"
+                        style={{ color: "var(--green)" }}
+                      >
+                        {formatMoney(inv.amount_paid, inv.currency)}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
                         <span
-                          className={
-                            parseFloat(inv.amount_due) > 0
-                              ? "text-warning"
-                              : "text-slate-600"
-                          }
+                          style={{
+                            color:
+                              parseFloat(inv.amount_due) > 0
+                                ? "var(--amber)"
+                                : "var(--text-dim)",
+                          }}
                         >
-                          {formatRON(inv.amount_due)}
+                          {formatMoney(inv.amount_due, inv.currency)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -249,7 +307,7 @@ export function InvoicesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {canEdit && inv.status === "Draft" && (
+                        {canEdit && (inv.status === "Draft" || inv.status === "Paid") && (
                           <button
                             className="btn-danger py-1 px-2 text-xs"
                             onClick={(e) => {

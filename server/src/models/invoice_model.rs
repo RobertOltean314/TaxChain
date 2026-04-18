@@ -66,10 +66,10 @@ impl InvoiceStatus {
     }
 }
 
-/// Romanian VAT rates (2025).
+/// Romanian VAT rates (2025 — standard rate raised to 21%).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VatRate {
-    /// 19% — standard rate
+    /// 21% — standard rate (raised from 19% effective 2025)
     Standard,
     /// 9% — food, pharma, books, hotel
     Reduced9,
@@ -86,15 +86,24 @@ impl Default for VatRate {
 }
 
 impl VatRate {
-    /// Returns the rate as a multiplier (e.g. `0.19` for Standard).
+    /// Returns the rate as a multiplier (e.g. `0.21` for Standard).
     pub fn multiplier(self) -> Decimal {
         match self {
-            VatRate::Standard => Decimal::new(19, 2),
+            VatRate::Standard => Decimal::new(21, 2),
             VatRate::Reduced9 => Decimal::new(9, 2),
             VatRate::Reduced5 => Decimal::new(5, 2),
             VatRate::Exempt => Decimal::ZERO,
         }
     }
+}
+
+/// Transaction type for accounting classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TransactionType {
+    /// Income — money coming in (revenue)
+    Income,
+    /// Expense — money going out (costs)
+    Expense,
 }
 
 // ============================================================================
@@ -108,6 +117,7 @@ pub struct Invoice {
     pub number: String,
     pub series: Option<String>,
     pub document_type: DocumentType,
+    pub transaction_type: Option<TransactionType>,
     pub status: InvoiceStatus,
 
     pub issued_date: NaiveDate,
@@ -195,6 +205,7 @@ pub struct InvoiceRequest {
     pub series: Option<String>,
 
     pub document_type: Option<DocumentType>,
+    pub transaction_type: Option<TransactionType>,
 
     pub issued_date: NaiveDate,
     pub due_date: Option<NaiveDate>,
@@ -270,6 +281,7 @@ impl Invoice {
             number: req.number.clone(),
             series: req.series.clone(),
             document_type: req.document_type.unwrap_or_default(),
+            transaction_type: req.transaction_type,
             status: InvoiceStatus::Draft,
             issued_date: req.issued_date,
             due_date: req.due_date,
@@ -300,6 +312,7 @@ impl Invoice {
             number: req.number.clone(),
             series: req.series.clone(),
             document_type: req.document_type.unwrap_or(existing.document_type),
+            transaction_type: req.transaction_type.or(existing.transaction_type),
             status: existing.status,
             issued_date: req.issued_date,
             due_date: req.due_date,

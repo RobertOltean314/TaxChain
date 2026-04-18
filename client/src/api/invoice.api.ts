@@ -23,6 +23,7 @@ export interface InvoicePayload {
   delivery_date?: string;
   issuer_pf_id?: string;
   issuer_pj_id?: string;
+  transaction_type?: "Income" | "Expense";
   partner_id: string;
   currency?: string;
   amount_paid?: string;

@@ -1,19 +1,30 @@
 import axios from "axios";
 
-const BASE = "http://localhost:8080";
+const BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: BASE,
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach Bearer token from window global (set by AuthContext)
+// Attach Bearer token + active entity headers on every request
 api.interceptors.request.use((config) => {
   const token = (window as any).__tc_token as string | undefined;
   if (token) {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Inject entity context headers from localStorage so the backend can
+  // scope data to the currently selected entity without needing React context.
+  const entityId = localStorage.getItem("tc_entity_id");
+  const entityType = localStorage.getItem("tc_entity_type");
+  if (entityId && entityType) {
+    config.headers = config.headers ?? {};
+    config.headers["X-Entity-Id"] = entityId;
+    config.headers["X-Entity-Type"] = entityType;
+  }
+
   return config;
 });
 

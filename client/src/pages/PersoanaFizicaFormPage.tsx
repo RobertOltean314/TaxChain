@@ -9,78 +9,13 @@ import {
 import { persoanaFizicaApi } from "../api/persoanaFizica.api";
 import { useToast } from "../components/ui/Toast";
 import { AppLayout } from "../components/ui/AppLayout";
-import { PageHeader, BtnPrimary } from "../components/ui/ui";
-
-// ── Form Field ─────────────────────────────────────────────────────────────
-
-interface FormFieldProps {
-  label: string;
-  required?: boolean;
-  error?: string;
-  children: React.ReactNode;
-}
-
-function FormField({ label, required, error, children }: FormFieldProps) {
-  return (
-    <div className="mb-6">
-      <label
-        className="block text-sm font-medium mb-2"
-        style={{ color: "var(--text)" }}
-      >
-        {label}
-        {required && <span style={{ color: "var(--red)" }}>*</span>}
-      </label>
-      {children}
-      {error && (
-        <p className="text-xs mt-1" style={{ color: "var(--red)" }}>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ── Input & Select Components ──────────────────────────────────────────────
-
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
-
-function Input(props: InputProps) {
-  return (
-    <input
-      {...props}
-      className="w-full px-3 py-2 rounded-lg border text-sm"
-      style={{
-        background: "var(--bg-input)",
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
-    />
-  );
-}
-
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  options: { value: string; label: string }[];
-}
-
-function Select({ options, ...props }: SelectProps) {
-  return (
-    <select
-      {...props}
-      className="w-full px-3 py-2 rounded-lg border text-sm"
-      style={{
-        background: "var(--bg-input)",
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  );
-}
+import {
+  PageHeader,
+  FormField,
+  Input,
+  Select,
+  Button,
+} from "../components/ui/ui";
 
 export default function PersoanaFizicaFormPage() {
   const navigate = useNavigate();
@@ -148,12 +83,12 @@ export default function PersoanaFizicaFormPage() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-4xl mx-auto fade-up">
+      <div className="w-full max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8 fade-up">
         <PageHeader
           title={
             isEdit ? "Editare Persoană Fizică" : "Adaugare Persoană Fizică"
           }
-          sub={isEdit ? `ID: ${id}` : undefined}
+          subtitle={isEdit ? `ID: ${id}` : undefined}
         />
 
         <form
@@ -178,12 +113,17 @@ export default function PersoanaFizicaFormPage() {
                 {...register("cnp")}
                 placeholder="1234567890123"
                 maxLength={13}
+                error={!!errors.cnp}
               />
             </FormField>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <FormField label="Nume" required error={errors.nume?.message}>
-                <Input {...register("nume")} placeholder="Acasă" />
+                <Input
+                  {...register("nume")}
+                  placeholder="Acasă"
+                  error={!!errors.nume}
+                />
               </FormField>
 
               <FormField
@@ -191,7 +131,11 @@ export default function PersoanaFizicaFormPage() {
                 required
                 error={errors.prenume?.message}
               >
-                <Input {...register("prenume")} placeholder="Ion" />
+                <Input
+                  {...register("prenume")}
+                  placeholder="Ion"
+                  error={!!errors.prenume}
+                />
               </FormField>
             </div>
 
@@ -199,7 +143,11 @@ export default function PersoanaFizicaFormPage() {
               label="Prenumele tatălui"
               error={errors.prenume_tata?.message}
             >
-              <Input {...register("prenume_tata")} placeholder="Gheorghe" />
+              <Input
+                {...register("prenume_tata")}
+                placeholder="Gheorghe"
+                error={!!errors.prenume_tata}
+              />
             </FormField>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -208,7 +156,11 @@ export default function PersoanaFizicaFormPage() {
                 required
                 error={errors.data_nasterii?.message}
               >
-                <Input {...register("data_nasterii")} type="date" />
+                <Input
+                  {...register("data_nasterii")}
+                  type="date"
+                  error={!!errors.data_nasterii}
+                />
               </FormField>
 
               <FormField label="Sexul" required error={errors.sex?.message}>
@@ -218,6 +170,7 @@ export default function PersoanaFizicaFormPage() {
                     { value: "M", label: "Masculin" },
                     { value: "F", label: "Feminin" },
                   ]}
+                  error={!!errors.sex}
                 />
               </FormField>
             </div>
@@ -243,6 +196,7 @@ export default function PersoanaFizicaFormPage() {
               <Input
                 {...register("adresa_domiciliu")}
                 placeholder="Str. Principale, nr. 123, Apt. 45"
+                error={!!errors.adresa_domiciliu}
               />
             </FormField>
 
@@ -252,6 +206,7 @@ export default function PersoanaFizicaFormPage() {
                   {...register("cod_postal")}
                   placeholder="012345"
                   maxLength={6}
+                  error={!!errors.cod_postal}
                 />
               </FormField>
 
@@ -260,6 +215,7 @@ export default function PersoanaFizicaFormPage() {
                   {...register("telefon")}
                   placeholder="+40 700 000 000"
                   type="tel"
+                  error={!!errors.telefon}
                 />
               </FormField>
             </div>
@@ -269,6 +225,7 @@ export default function PersoanaFizicaFormPage() {
                 {...register("email")}
                 placeholder="ion.acasă@example.com"
                 type="email"
+                error={!!errors.email}
               />
             </FormField>
           </div>
@@ -289,7 +246,8 @@ export default function PersoanaFizicaFormPage() {
               <Input
                 {...register("iban")}
                 placeholder="ROXX XXXX XXXX XXXX XXXX XXXX"
-                style={{ fontFamily: "monospace", letterSpacing: "0.05em" }}
+                className="font-mono"
+                error={!!errors.iban}
               />
             </FormField>
           </div>
@@ -311,6 +269,7 @@ export default function PersoanaFizicaFormPage() {
                   { value: "Inactiv", label: "Inactiv" },
                   { value: "Suspendat", label: "Suspendat" },
                 ]}
+                error={!!errors.stare}
               />
             </FormField>
           </div>
@@ -320,25 +279,22 @@ export default function PersoanaFizicaFormPage() {
             className="flex items-center gap-3 pt-6 border-t"
             style={{ borderColor: "var(--border)" }}
           >
-            <BtnPrimary
+            <Button
               type="submit"
+              variant="primary"
               loading={isSubmitting}
               disabled={!isDirty}
             >
               {isEdit ? "Actualizează" : "Crează"}
-            </BtnPrimary>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => navigate("/persoane-fizice")}
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm rounded-lg border transition-colors disabled:opacity-50"
-              style={{
-                color: "var(--text-sub)",
-                borderColor: "var(--border)",
-              }}
             >
               Anulează
-            </button>
+            </Button>
           </div>
         </form>
       </div>

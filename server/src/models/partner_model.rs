@@ -50,6 +50,10 @@ pub struct Partner {
     pub persoana_fizica_id: Option<Uuid>,
     pub persoana_juridica_id: Option<Uuid>,
 
+    /// Which entity's scope this partner belongs to (set from entity context at creation).
+    pub owner_pf_id: Option<Uuid>,
+    pub owner_pj_id: Option<Uuid>,
+
     pub created_by: Uuid,
 
     pub created_at: DateTime<Utc>,
@@ -96,9 +100,13 @@ pub struct PartnerRequest {
 }
 
 impl Partner {
-    pub fn from_request(req: PartnerRequest, created_by: Uuid) -> Self {
+    pub fn from_request(
+        req: PartnerRequest,
+        created_by: Uuid,
+        owner_pf_id: Option<Uuid>,
+        owner_pj_id: Option<Uuid>,
+    ) -> Self {
         let now = Utc::now();
-
         Self {
             id: Uuid::new_v4(),
             denumire: req.denumire,
@@ -115,6 +123,8 @@ impl Partner {
             iban: req.iban,
             persoana_fizica_id: req.persoana_fizica_id,
             persoana_juridica_id: req.persoana_juridica_id,
+            owner_pf_id,
+            owner_pj_id,
             created_by,
             created_at: now,
             updated_at: now,
@@ -123,7 +133,6 @@ impl Partner {
 
     pub fn update_from_request(existing: &Partner, req: PartnerRequest) -> Self {
         let now = Utc::now();
-
         Self {
             id: existing.id,
             denumire: req.denumire,
@@ -140,6 +149,8 @@ impl Partner {
             iban: req.iban,
             persoana_fizica_id: req.persoana_fizica_id,
             persoana_juridica_id: req.persoana_juridica_id,
+            owner_pf_id: existing.owner_pf_id,
+            owner_pj_id: existing.owner_pj_id,
             created_by: existing.created_by,
             created_at: existing.created_at,
             updated_at: now,
