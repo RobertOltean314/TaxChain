@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker exec *)",
+      "Bash(psql \"postgres://robert:1234@localhost:5432/taxchain\" -c \"SELECT id, wallet_address, email, role FROM users WHERE lower\\(wallet_address\\) = lower\\('0x00981e3b75647B7Bd51f87218B19C70C93E2479c'\\);\")",
+      "Bash(node -e \"const z = require\\('/home/robert/Desktop/work/programming/university/taxchain/client/node_modules/zod'\\); const s = z.string\\(\\); console.log\\(typeof s.transform, typeof s.pipe, typeof z.preprocess\\)\")",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(cargo test *)",
+      "Bash(grep -E \"^test |FAILED|passed|failed|ok$|FAILED$\")",
+      "Read(//home/robert/Desktop/work/programming/university/**)"
+    ]
+  }
+}

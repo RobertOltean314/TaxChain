@@ -116,6 +116,10 @@ pub struct PersoanaFizicaRequest {
     pub wallet: Option<String>,
 }
 
+fn normalize_iban(iban: &str) -> String {
+    iban.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_uppercase()
+}
+
 impl PersoanaFizica {
     pub fn new(
         cnp: String,
@@ -176,7 +180,7 @@ impl PersoanaFizica {
             sex: req.sex,
             adresa_domiciliu: req.adresa_domiciliu.clone(),
             cod_postal: req.cod_postal.clone(),
-            iban: req.iban.clone(),
+            iban: normalize_iban(&req.iban),
             telefon: req.telefon.clone(),
             email: req.email.clone(),
             stare: req.stare.unwrap_or_default(),
@@ -199,7 +203,7 @@ impl PersoanaFizica {
             sex: req.sex,
             adresa_domiciliu: req.adresa_domiciliu.clone(),
             cod_postal: req.cod_postal.clone(),
-            iban: req.iban.clone(),
+            iban: normalize_iban(&req.iban),
             telefon: req.telefon.clone(),
             email: req.email.clone(),
             stare: req.stare.unwrap_or(existing.stare),

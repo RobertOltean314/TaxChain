@@ -6,13 +6,15 @@ use actix_web::{App, HttpServer, web};
 use reqwest::Client;
 use taxchain::{
     auth::middleware::JwtAuthMiddleware,
+    blockchain::anchor::{AnchorService, DynAnchorService},
     handlers::{
+        anchor_handlers::anchor_invoice_handler,
+        audit_handlers::get_audit_log,
         auth_handlers::{
             AuthConfig, google_login_handler, link_entity_handler, logout, refresh_token_handler,
             wallet_nonce_handler, wallet_verify_handler,
         },
         bnr_handlers::get_bnr_rate,
-        report_handlers::get_vat_summary,
         create_persoana_fizica, create_persoana_juridica, delete_persoana_fizica,
         delete_persoana_juridica,
         efactura_handlers::{
@@ -29,20 +31,29 @@ use taxchain::{
             update_partener,
         },
         persoana_juridica_handlers::get_persoana_juridica_by_id,
+        proof_handlers::{
+            generate_proof, generate_zk_proof, list_all_proofs, list_proofs, public_profile,
+            verify_proof,
+        },
+        public_handlers::list_public_entities,
+        report_handlers::get_vat_summary,
         update_persoana_fizica, update_persoana_juridica,
     },
     services::{
+        audit_service::{DynAuditRepository, PgAuditRepository},
         bnr_service::{BnrService, DynBnrService},
-        report_service::{DynReportService, ReportService},
         e_factura_service::{DynEFacturaRepository, PgEFacturaRepository},
         entity_service::{DynEntityRepository, PgEntityRepository},
         invoice_service::{DynInvoiceRepository, PgInvoiceRepository},
         partner_service::{DynPartnerRepository, PgPartnerRepository},
         persoana_fizica_service::{DynPersoanaFizicaRepository, PgPersoanaFizicaRepository},
         persoana_juridica_service::{DynPersoanaJuridicaRepository, PgPersoanaJuridicaRepository},
+        proof_service::{DynProofRepository, ProofRepository},
+        report_service::{DynReportService, ReportService},
         user_service::{DynUserRepository, PgUserRepository},
     },
     utils::{io_error, require_env},
+    zk::{DynZkService, ZkService},
 };
 
 #[actix_web::main]
@@ -52,6 +63,8 @@ async fn main() -> std::io::Result<()> {
     let database_url = require_env("DATABASE_URL")?;
     let jwt_secret = require_env("JWT_SECRET")?;
     let google_client_id = require_env("GOOGLE_CLIENT_ID")?;
+    let sepolia_rpc_url = require_env("SEPOLIA_RPC_URL")?;
+    let invoice_registry_address = require_env("INVOICE_REGISTRY_ADDRESS")?;
 
     let access_token_ttl: i64 = 3600;
     let refresh_token_ttl_days: i64 = 30;
@@ -99,6 +112,191 @@ async fn main() -> std::io::Result<()> {
     .await
     .map_err(|e| io_error(&format!("Failed to add tip_tranzactie column: {e}")))?;
 
+    // Create the fiscal proofs table if it does not yet exist (migration 08).
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS dovada_fiscala (
+            id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id          UUID         NOT NULL REFERENCES users(id),
+            entity_type      VARCHAR(2)   NOT NULL CHECK (entity_type IN ('PF', 'PJ')),
+            entity_id        UUID         NOT NULL,
+            period_from      DATE         NOT NULL,
+            period_to        DATE         NOT NULL,
+            vat_colectat     NUMERIC(14,2) NOT NULL DEFAULT 0,
+            vat_deductibil   NUMERIC(14,2) NOT NULL DEFAULT 0,
+            vat_net          NUMERIC(14,2) NOT NULL DEFAULT 0,
+            venituri_brute   NUMERIC(14,2) NOT NULL DEFAULT 0,
+            cheltuieli_brute NUMERIC(14,2) NOT NULL DEFAULT 0,
+            proof_hash       VARCHAR(66)  NOT NULL,
+            period_hash      VARCHAR(66)  NOT NULL,
+            tx_hash          VARCHAR(66)  NOT NULL,
+            block_number     BIGINT       NOT NULL,
+            anchored_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| io_error(&format!("Failed to create dovada_fiscala table: {e}")))?;
+
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_dovada_fiscala_entity ON dovada_fiscala (entity_type, entity_id, period_from)",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| io_error(&format!("Failed to create dovada_fiscala index: {e}")))?;
+
+    // Also ensure blockchain columns exist on factura (migration 07 for older DBs).
+    for col in &[
+        ("tx_hash", "VARCHAR(66)"),
+        ("block_number", "BIGINT"),
+        ("anchored_at", "TIMESTAMPTZ"),
+    ] {
+        let sql = format!(
+            r#"
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'factura'
+                      AND column_name = '{}'
+                ) THEN
+                    ALTER TABLE factura ADD COLUMN {} {};
+                END IF;
+            END$$
+            "#,
+            col.0, col.0, col.1
+        );
+        sqlx::query(&sql)
+            .execute(&pool)
+            .await
+            .map_err(|e| io_error(&format!("Failed to add {} to factura: {e}", col.0)))?;
+    }
+
+    // ── Migration 09: extend dovada_fiscala with tax + ZK columns ────────────
+    for (col, col_type) in &[
+        ("impozit_venit", "NUMERIC(14,2) NOT NULL DEFAULT 0"),
+        ("cas", "NUMERIC(14,2) NOT NULL DEFAULT 0"),
+        ("cass", "NUMERIC(14,2) NOT NULL DEFAULT 0"),
+        ("impozit_profit", "NUMERIC(14,2) NOT NULL DEFAULT 0"),
+        ("total_obligatii", "NUMERIC(14,2) NOT NULL DEFAULT 0"),
+        ("is_zk", "BOOLEAN NOT NULL DEFAULT false"),
+        ("zk_proof_bytes", "BYTEA"),
+        ("entity_name", "VARCHAR(200) NOT NULL DEFAULT ''"),
+        ("entity_fiscal_code", "VARCHAR(20) NOT NULL DEFAULT ''"),
+    ] {
+        let sql = format!(
+            r#"
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'dovada_fiscala'
+                      AND column_name = '{}'
+                ) THEN
+                    ALTER TABLE dovada_fiscala ADD COLUMN {} {};
+                END IF;
+            END$$
+            "#,
+            col, col, col_type
+        );
+        sqlx::query(&sql)
+            .execute(&pool)
+            .await
+            .map_err(|e| io_error(&format!("Failed to add {} to dovada_fiscala: {e}", col)))?;
+    }
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_dovada_fiscala_fiscal_code ON dovada_fiscala (entity_fiscal_code)"
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| io_error(&format!("Failed to create fiscal_code index: {e}")))?;
+
+    // ── Migration 10: fix invoice unique constraints ──────────────────────────
+    // The original NULLS NOT DISTINCT constraints treated all NULL issuer IDs
+    // as equal, blocking the second invoice from any PJ issuer (emitent_pf_id
+    // is NULL for PJ invoices). Replace with partial unique indexes.
+    sqlx::query("ALTER TABLE factura DROP CONSTRAINT IF EXISTS chk_unique_numar_per_emitent_pf")
+        .execute(&pool)
+        .await
+        .map_err(|e| {
+            io_error(&format!(
+                "Failed to drop constraint chk_unique_numar_per_emitent_pf: {e}"
+            ))
+        })?;
+
+    sqlx::query("ALTER TABLE factura DROP CONSTRAINT IF EXISTS chk_unique_numar_per_emitent_pj")
+        .execute(&pool)
+        .await
+        .map_err(|e| {
+            io_error(&format!(
+                "Failed to drop constraint chk_unique_numar_per_emitent_pj: {e}"
+            ))
+        })?;
+
+    sqlx::query(
+        r#"
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_numar_per_emitent_pf
+            ON factura (numar, emitent_pf_id)
+            WHERE emitent_pf_id IS NOT NULL;
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| {
+        io_error(&format!(
+            "Failed to create idx_unique_numar_per_emitent_pf: {e}"
+        ))
+    })?;
+
+    sqlx::query(
+        r#"
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_numar_per_emitent_pj
+            ON factura (numar, emitent_pj_id)
+            WHERE emitent_pj_id IS NOT NULL;
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| {
+        io_error(&format!(
+            "Failed to create idx_unique_numar_per_emitent_pj: {e}"
+        ))
+    })?;
+
+    // ── Migration 11: audit trail ────────────────────────────────────────────
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            action          VARCHAR(64)  NOT NULL,
+            actor_user_id   UUID         NOT NULL REFERENCES users(id),
+            entity_type     VARCHAR(2),
+            entity_id       UUID,
+            resource_type   VARCHAR(32)  NOT NULL,
+            resource_id     UUID,
+            payload         TEXT         NOT NULL DEFAULT '{}',
+            created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+        "#,
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| io_error(&format!("Failed to create audit_log table: {e}")))?;
+
+    for idx_sql in &[
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log (created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log (entity_type, entity_id)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_resource ON audit_log (resource_type, resource_id)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log (actor_user_id)",
+    ] {
+        sqlx::query(idx_sql)
+            .execute(&pool)
+            .await
+            .map_err(|e| io_error(&format!("Failed to create audit_log index: {e}")))?;
+    }
+
     // Clear the BNR rate cache so any rates stored with the old buggy parser
     // (which divided non-multiplier currencies by 100) are discarded and
     // re-fetched correctly on the next request. The table is purely a cache
@@ -126,10 +324,18 @@ async fn main() -> std::io::Result<()> {
     let invoice_repo: DynInvoiceRepository = Arc::new(PgInvoiceRepository::new(pool.clone()));
     let efactura_repo: DynEFacturaRepository = Arc::new(PgEFacturaRepository::new(pool.clone()));
     let entity_repo: DynEntityRepository = Arc::new(PgEntityRepository::new(pool.clone()));
-    let bnr_service: DynBnrService =
-        Arc::new(BnrService::new(pool.clone(), bnr_http_client));
+    let bnr_service: DynBnrService = Arc::new(BnrService::new(pool.clone(), bnr_http_client));
     let report_service: DynReportService = Arc::new(ReportService::new(pool.clone()));
-
+    let audit_repo: DynAuditRepository = Arc::new(PgAuditRepository::new(pool.clone()));
+    let proof_repo: DynProofRepository = Arc::new(ProofRepository::new(pool.clone()));
+    let zk_service: DynZkService = Arc::new(
+        ZkService::load_or_generate()
+            .map_err(|e| io_error(&format!("Failed to initialize ZK service: {e}")))?,
+    );
+    let anchor_service: DynAnchorService = Arc::new(
+        AnchorService::new(&sepolia_rpc_url, &invoice_registry_address)
+            .map_err(|e| io_error(&format!("Failed to init AnchorService: {e}")))?,
+    );
     let auth_config = AuthConfig {
         jwt_secret,
         access_token_ttl,
@@ -151,6 +357,7 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(cors)
+            .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(pf_repo.clone()))
             .app_data(web::Data::new(pj_repo.clone()))
             .app_data(web::Data::new(user_repo.clone()))
@@ -162,6 +369,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(entity_repo.clone()))
             .app_data(web::Data::new(bnr_service.clone()))
             .app_data(web::Data::new(report_service.clone()))
+            .app_data(web::Data::new(proof_repo.clone()))
+            .app_data(web::Data::new(zk_service.clone()))
+            .app_data(web::Data::new(anchor_service.clone()))
+            .app_data(web::Data::new(audit_repo.clone()))
             // ── Auth (public) ──────────────────────────────────────────────
             .service(
                 web::scope("/auth")
@@ -218,6 +429,7 @@ async fn main() -> std::io::Result<()> {
                     .service(update_invoice)
                     .service(update_invoice_status)
                     .service(update_invoice_payment)
+                    .service(anchor_invoice_handler)
                     .service(delete_invoice),
             )
             // ── eFactura (ANAF mock) ───────────────────────────────────────
@@ -243,8 +455,22 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/reports")
                     .wrap(JwtAuthMiddleware)
-                    .service(get_vat_summary),
+                    .service(get_vat_summary)
+                    .service(generate_proof)
+                    .service(generate_zk_proof)
+                    .service(list_proofs)
+                    .service(list_all_proofs)
+                    .service(verify_proof),
             )
+            // ── Audit trail (Auditor + Admin) ─────────────────────────────
+            .service(
+                web::scope("/jurnal-audit")
+                    .wrap(JwtAuthMiddleware)
+                    .service(get_audit_log),
+            )
+            // ── Public entity profiles & search (no auth) ─────────────────
+            .service(public_profile)
+            .service(list_public_entities)
     })
     .bind("0.0.0.0:8080")?
     .run()

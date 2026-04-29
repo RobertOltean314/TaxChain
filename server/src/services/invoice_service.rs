@@ -51,7 +51,10 @@ const SELECT_INVOICE: &str = "
         conditii_plata        AS payment_terms,
         created_by,
         created_at,
-        updated_at
+        updated_at,
+        tx_hash,
+        block_number,
+        anchored_at
     FROM factura
 ";
 
@@ -114,7 +117,8 @@ const CREATE_INVOICE: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const INSERT_LINE: &str = "
@@ -174,7 +178,8 @@ const UPDATE_HEADER: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const UPDATE_STATUS: &str = "
@@ -203,7 +208,8 @@ const UPDATE_STATUS: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        tx_hash, block_number, anchored_at
 ";
 
 // When marking as Paid, automatically set suma_platita = total and rest_de_plata = 0.
@@ -236,7 +242,8 @@ const UPDATE_STATUS_TO_PAID: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const UPDATE_PAYMENT: &str = "
@@ -267,7 +274,8 @@ const UPDATE_PAYMENT: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const DELETE_LINES: &str = "DELETE FROM factura_linie WHERE factura_id = $1";
@@ -304,6 +312,9 @@ struct InvoiceRow {
     created_by: Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
+    tx_hash: Option<String>,
+    block_number: Option<i64>,
+    anchored_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -386,6 +397,9 @@ fn row_to_invoice(row: InvoiceRow) -> Result<Invoice, sqlx::Error> {
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: row.updated_at,
+        tx_hash: row.tx_hash,
+        block_number: row.block_number,
+        anchored_at: row.anchored_at,
     })
 }
 
@@ -503,6 +517,14 @@ pub trait InvoiceRepository: Send + Sync {
         user_id: Uuid,
         series: &str,
     ) -> Result<String, sqlx::Error>;
+
+    /// Stores the blockchain anchoring result on an invoice.
+    async fn update_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error>;
 }
 
 pub type DynInvoiceRepository = Arc<dyn InvoiceRepository>;
@@ -831,5 +853,49 @@ impl InvoiceRepository for PgInvoiceRepository {
             .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    async fn update_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error> {
+        let row = sqlx::query_as::<_, InvoiceRow>(
+            "UPDATE factura
+             SET tx_hash = $1, block_number = $2, anchored_at = NOW()
+             WHERE id = $3
+             RETURNING
+                 id,
+                 numar              AS number,
+                 serie              AS series,
+                 tip_document::text AS document_type,
+                 tip_tranzactie::text AS transaction_type,
+                 stare::text        AS status,
+                 data_emitere       AS issued_date,
+                 data_scadenta      AS due_date,
+                 data_livrare       AS delivery_date,
+                 emitent_pf_id      AS issuer_pf_id,
+                 emitent_pj_id      AS issuer_pj_id,
+                 partener_id        AS partner_id,
+                 moneda             AS currency,
+                 total_fara_tva::text  AS subtotal,
+                 total_tva::text       AS total_vat,
+                 total_cu_tva::text    AS total,
+                 suma_platita::text    AS amount_paid,
+                 rest_de_plata::text   AS amount_due,
+                 factura_referinta_id  AS reference_invoice_id,
+                 observatii            AS notes,
+                 conditii_plata        AS payment_terms,
+                 created_by, created_at, updated_at,
+                 tx_hash, block_number, anchored_at",
+        )
+        .bind(tx_hash)
+        .bind(block_number)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(row_to_invoice).transpose()
     }
 }

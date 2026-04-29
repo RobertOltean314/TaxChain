@@ -40,7 +40,7 @@ pub async fn find_all_partener(
 ) -> impl Responder {
     let user = match require_role(
         &req,
-        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+        &[UserRole::Admin, UserRole::Taxpayer],
     ) {
         Ok(u) => u,
         Err(resp) => return resp,
@@ -80,7 +80,7 @@ pub async fn get_partener_by_id(
 ) -> impl Responder {
     if let Err(resp) = require_role(
         &req,
-        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+        &[UserRole::Admin, UserRole::Taxpayer],
     ) {
         return resp;
     }

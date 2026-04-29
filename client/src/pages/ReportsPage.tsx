@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useBalance } from "wagmi";
 import { AppLayout } from "../components/ui/AppLayout";
 import { invoiceApi } from "../api/invoice.api";
 import { partnerApi } from "../api/partner.api";
 import { bnrApi } from "../api/bnr.api";
 import { reportApi } from "../api/report.api";
+import { proofApi } from "../api/proof.api";
 import { useToast } from "../components/ui/Toast";
 import { useEntity } from "../auth/useEntity";
+import { useAuth } from "../auth/useAuth";
 import { PageHeader, Button, Spinner } from "../components/ui/ui";
-import type { Invoice, Partner, VatSummary } from "../types";
+import type { FiscalProof, Invoice, Partner, VatSummary } from "../types";
 
 // ── Formatare ──────────────────────────────────────────────────────────────
 
@@ -443,23 +447,23 @@ function SummaryCard({
 
   return (
     <div
-      className="card p-5 fade-up"
+      className="card p-4 fade-up min-w-0 overflow-hidden"
       style={{ animationDelay: `${index * 55}ms` }}
     >
       <p
-        className="text-xs font-mono uppercase tracking-wider mb-3 truncate"
+        className="text-[10px] font-mono uppercase tracking-wider mb-2 truncate"
         style={{ color: "var(--text-dim)" }}
       >
         {label}
       </p>
       <p
-        className="font-display text-xl sm:text-2xl font-bold tracking-tight font-mono number-in truncate"
+        className="font-display text-lg font-bold tracking-tight font-mono number-in truncate"
         style={{ color: valueColor, animationDelay: `${index * 55 + 150}ms` }}
       >
         {value}
       </p>
       {sub && (
-        <p className="text-xs mt-1.5 truncate" style={{ color: "var(--text-dim)" }}>
+        <p className="text-[11px] mt-1 truncate" style={{ color: "var(--text-dim)" }}>
           {sub}
         </p>
       )}
@@ -475,6 +479,20 @@ export function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { activeEntity } = useEntity();
+  const { user } = useAuth();
+  const isReadOnly = user?.role === "Auditor";
+
+  const [proofs, setProofs] = useState<FiscalProof[]>([]);
+  const [proofSearch, setProofSearch] = useState("");
+  const [proofSort, setProofSort] = useState<"period_desc" | "period_asc" | "total_desc" | "total_asc">("period_desc");
+  const [isGeneratingProof, setIsGeneratingProof] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [verifyResults, setVerifyResults] = useState<Record<string, { valid: boolean; verified_at: string }>>({});
+
+  const { data: walletBalance, isLoading: balanceLoading } = useBalance({
+    address: user?.assigned_wallet_address as `0x${string}` | undefined,
+  });
 
   const [eurRate, setEurRate] = useState(5.0);
   const [usdRate, setUsdRate] = useState(4.6);
@@ -534,6 +552,45 @@ export function ReportsPage() {
   }, []);
 
   useEffect(() => {
+    proofApi.list().then(setProofs).catch(() => {});
+  }, []);
+
+  const handleCopyAddress = () => {
+    const addr = user?.assigned_wallet_address;
+    if (!addr) return;
+    navigator.clipboard.writeText(addr).then(() => {
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+    });
+  };
+
+  const handleGenerateProof = async () => {
+    const [from, to] = periodToDateRange(periodType, selectedYear, selectedQuarter, selectedMonth);
+    setIsGeneratingProof(true);
+    try {
+      const result = await proofApi.generateZk(from, to);
+      setProofs((prev) => [result.proof, ...prev]);
+      toast("Dovada ZK ancorată cu succes pe blockchain!");
+    } catch {
+      toast("Eroare la generarea dovezii ZK. (Generarea poate dura ~30s)", "err");
+    } finally {
+      setIsGeneratingProof(false);
+    }
+  };
+
+  const handleVerify = async (proofId: string) => {
+    setVerifyingId(proofId);
+    try {
+      const result = await proofApi.verify(proofId);
+      setVerifyResults((prev) => ({ ...prev, [proofId]: { valid: result.valid, verified_at: result.verified_at } }));
+    } catch {
+      toast("Eroare la verificarea dovezii ZK.", "err");
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  useEffect(() => {
     if (activeView !== "d300") return;
     const [from, to] = periodToDateRange(periodType, selectedYear, selectedQuarter, selectedMonth);
     setD300Loading(true);
@@ -543,6 +600,7 @@ export function ReportsPage() {
       .catch(() => toast("Eroare la încărcarea datelor D300.", "err"))
       .finally(() => setD300Loading(false));
   }, [activeView, periodType, selectedYear, selectedQuarter, selectedMonth, toast]);
+
 
   const partnerMap = useMemo(
     () => new Map(partners.map((p) => [p.id, p])),
@@ -802,7 +860,7 @@ export function ReportsPage() {
         ) : (
           <div className="space-y-8">
             {/* ── Carduri sumar ────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <SummaryCard
                 label="Facturi totale"
                 value={String(summary.totalInvoices)}
@@ -842,6 +900,67 @@ export function ReportsPage() {
                 index={5}
               />
             </div>
+
+            {/* ── Estimare obligații fiscale ───────────────────────────────── */}
+            {taxData && (
+              <section className="fade-up" style={{ animationDelay: "160ms" }}>
+                <h2 className="text-lg font-semibold font-display mb-3" style={{ color: "var(--text)" }}>
+                  Estimare Obligații Fiscale
+                </h2>
+                <div className="card p-5">
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <p className="text-xs font-mono uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>
+                      {periodLabel} ·{" "}
+                      {taxData.type === "PF" ? "Sistem real PFA" : taxData.isMicro ? "Micro-întreprindere (3%)" : "Impozit profit (16%)"}
+                    </p>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "color-mix(in srgb, var(--amber) 12%, transparent)", color: "var(--amber)" }}>
+                      Estimare — doar facturi plătite
+                    </span>
+                  </div>
+
+                  {taxData.type === "PF" ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                      {[
+                        { label: "CAS (25%)", value: taxData.cas, note: "plafon: 97.200 RON" },
+                        { label: "CASS (10%)", value: taxData.cass, note: "plafon: 243.000 RON" },
+                        { label: "Impozit venit (10%)", value: taxData.impozitVenit, note: "după CAS/CASS" },
+                        { label: "TVA net", value: vatNet, note: vatNet >= 0 ? "de plată" : "de rambursat" },
+                        { label: "Total obligații", value: taxData.totalObligatii + Math.max(0, vatNet), note: "CAS + CASS + IV + TVA", bold: true },
+                      ].map(({ label, value, note, bold }) => (
+                        <div key={label}>
+                          <p className="text-xs mb-1" style={{ color: "var(--text-dim)" }}>{label}</p>
+                          <p className={`text-lg font-mono ${bold ? "font-bold" : "font-semibold"}`} style={{ color: bold ? "var(--amber)" : "var(--text)" }}>
+                            {formatRON(value)}
+                          </p>
+                          <p className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>{note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      {[
+                        { label: "Venituri (ex-TVA)", value: taxData.revenue, note: "baza de impozitare" },
+                        { label: `Impozit ${taxData.isMicro ? "micro (3%)" : "profit (16%)"}`, value: taxData.tax, note: `${(taxData.taxRate * 100).toFixed(0)}% × ${formatRON(taxData.taxBase)}` },
+                        { label: "TVA net", value: vatNet, note: vatNet >= 0 ? "de plată" : "de rambursat" },
+                        { label: "Total obligații", value: taxData.tax + Math.max(0, vatNet), note: "impozit + TVA", bold: true },
+                      ].map(({ label, value, note, bold }) => (
+                        <div key={label}>
+                          <p className="text-xs mb-1" style={{ color: "var(--text-dim)" }}>{label}</p>
+                          <p className={`text-lg font-mono ${bold ? "font-bold" : "font-semibold"}`} style={{ color: bold ? "var(--amber)" : "var(--text)" }}>
+                            {formatRON(value)}
+                          </p>
+                          <p className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>{note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-[10px] mt-4 pt-3" style={{ borderTop: "1px solid var(--border)", color: "var(--text-dim)" }}>
+                    Calculat conform Codului Fiscal 2025. CAS 25% plafonat la 24 × salariu minim (97.200 RON), CASS 10% plafonat la 60 × salariu minim (243.000 RON). Se actualizează automat la fiecare factură plătită adăugată.
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* ── Venituri vs Cheltuieli ───────────────────────────────────── */}
             <section
@@ -1249,6 +1368,342 @@ export function ReportsPage() {
                 </p>
               </section>
             )}
+
+            {/* ── Dovezi Fiscale Blockchain ─────────────────────────────────── */}
+            <section
+              className="space-y-4 fade-up"
+              style={{ animationDelay: "420ms" }}
+            >
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <h2
+                    className="text-lg font-semibold font-display"
+                    style={{ color: "var(--text)" }}
+                  >
+                    Dovezi de Conformitate Fiscală
+                  </h2>
+                  <p className="text-sm mt-1" style={{ color: "var(--text-dim)" }}>
+                    Ancorează dovezi imutabile direct din portofelul tău Ethereum pe Sepolia.
+                    Profilul public este verificabil de oricine fără a expune date financiare.
+                  </p>
+                </div>
+                {!isReadOnly && periodType !== "all" && (
+                  <button
+                    onClick={handleGenerateProof}
+                    disabled={isGeneratingProof}
+                    className="btn-primary flex items-center gap-2 shrink-0"
+                    style={{ background: "var(--violet, #6F00FF)", border: "none" }}
+                  >
+                    {isGeneratingProof ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
+                        Generare ZK (~30s)...
+                      </>
+                    ) : (
+                      "Generează Dovadă ZK"
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <div
+                className="rounded-xl px-4 py-3 text-xs"
+                style={{
+                  background: "color-mix(in srgb, var(--violet, #6F00FF) 8%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--violet, #6F00FF) 25%, transparent)",
+                  color: "var(--violet, #6F00FF)",
+                }}
+              >
+                <strong>Dovadă ZK Groth16:</strong> Probează că sumele TVA declarate sunt corect derivate
+                din facturile individuale — fără a expune valorile per factură.
+                Dovada este ancorată pe Sepolia de portofelul tău Ethereum personal, nu de platformă.
+              </div>
+
+              {/* ── ETH Wallet & Faucet card ────────────────────────────────── */}
+              {!isReadOnly && user?.assigned_wallet_address && (
+                <div
+                  className="rounded-xl p-4 space-y-3"
+                  style={{
+                    background: "color-mix(in srgb, var(--amber) 6%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--amber) 22%, transparent)",
+                  }}
+                >
+                  {/* Header row */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs font-mono uppercase tracking-wider font-semibold" style={{ color: "var(--amber)" }}>
+                        Portofel Ethereum Personal (Sepolia)
+                      </p>
+                      <span
+                        className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full"
+                        style={
+                          balanceLoading
+                            ? { color: "var(--text-dim)" }
+                            : walletBalance && walletBalance.value > 0n
+                              ? { background: "color-mix(in srgb, var(--green) 12%, transparent)", color: "var(--green)" }
+                              : { background: "color-mix(in srgb, var(--amber) 12%, transparent)", color: "var(--amber)" }
+                        }
+                      >
+                        {balanceLoading
+                          ? "..."
+                          : walletBalance
+                            ? `${parseFloat(walletBalance.formatted).toFixed(4)} ${walletBalance.symbol}`
+                            : "—"}
+                      </span>
+                    </div>
+                    <a
+                      href={`https://sepolia.etherscan.io/address/${user.assigned_wallet_address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                      style={{
+                        background: "color-mix(in srgb, var(--blue) 10%, transparent)",
+                        color: "var(--blue)",
+                        border: "1px solid color-mix(in srgb, var(--blue) 25%, transparent)",
+                      }}
+                    >
+                      Vezi pe Etherscan ↗
+                    </a>
+                  </div>
+
+                  {/* Address + copy */}
+                  <div
+                    className="flex items-center gap-2 rounded-lg px-3 py-2"
+                    style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+                  >
+                    <code
+                      className="font-mono text-xs flex-1 truncate"
+                      style={{ color: "var(--text)" }}
+                    >
+                      {user.assigned_wallet_address}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={handleCopyAddress}
+                      className="text-xs px-2.5 py-1 rounded-md font-medium shrink-0 transition-all"
+                      style={
+                        copiedAddress
+                          ? { background: "color-mix(in srgb, var(--green) 15%, transparent)", color: "var(--green)" }
+                          : { background: "color-mix(in srgb, var(--amber) 12%, transparent)", color: "var(--amber)" }
+                      }
+                    >
+                      {copiedAddress ? "✓ Copiat!" : "Copiază"}
+                    </button>
+                  </div>
+
+                  {/* Faucet links */}
+                  <div>
+                    <p className="text-xs mb-2" style={{ color: "var(--text-dim)" }}>
+                      Copiați adresa de mai sus, apoi obțineți Sepolia ETH gratuit (necesar pentru gas):
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Alchemy Faucet", url: "https://www.alchemy.com/faucets/ethereum-sepolia" },
+                        { label: "QuickNode Faucet", url: "https://faucet.quicknode.com/ethereum/sepolia" },
+                        { label: "Chainlink Faucet", url: "https://faucets.chain.link/sepolia" },
+                        { label: "Google Cloud Faucet", url: "https://cloud.google.com/application/web3/faucet/ethereum/sepolia" },
+                      ].map(({ label, url }) => (
+                        <a
+                          key={label}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                          style={{
+                            background: "var(--bg-surface)",
+                            color: "var(--text-dim)",
+                            border: "1px solid var(--border)",
+                          }}
+                        >
+                          {label} ↗
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {proofs.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    className="input flex-1 min-w-[180px] px-4 py-2 rounded-xl text-sm"
+                    placeholder="Caută după perioadă (ex. 2025-01)…"
+                    value={proofSearch}
+                    onChange={(e) => setProofSearch(e.target.value)}
+                  />
+                  <select
+                    className="input px-3 py-2 rounded-xl text-sm"
+                    value={proofSort}
+                    onChange={(e) => setProofSort(e.target.value as typeof proofSort)}
+                  >
+                    <option value="period_desc">Perioadă: Descrescător</option>
+                    <option value="period_asc">Perioadă: Crescător</option>
+                    <option value="total_desc">Total obligații: Mare → Mic</option>
+                    <option value="total_asc">Total obligații: Mic → Mare</option>
+                  </select>
+                </div>
+              )}
+
+              {(() => {
+                const q = proofSearch.trim().toLowerCase();
+                const visibleProofs = proofs
+                  .filter((p) =>
+                    !q ||
+                    p.period_from?.toLowerCase().includes(q) ||
+                    p.period_to?.toLowerCase().includes(q),
+                  )
+                  .sort((a, b) => {
+                    switch (proofSort) {
+                      case "period_asc":  return a.period_from.localeCompare(b.period_from);
+                      case "period_desc": return b.period_from.localeCompare(a.period_from);
+                      case "total_asc":  return parseFloat(a.total_obligatii) - parseFloat(b.total_obligatii);
+                      case "total_desc": return parseFloat(b.total_obligatii) - parseFloat(a.total_obligatii);
+                    }
+                  });
+
+                if (proofs.length === 0) return (
+                  <div
+                    className="card px-5 py-10 text-center text-sm"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    Nicio dovadă fiscală generată încă.
+                  </div>
+                );
+
+                if (visibleProofs.length === 0) return (
+                  <div
+                    className="card px-5 py-10 text-center text-sm"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    Nicio dovadă corespunde căutării.
+                  </div>
+                );
+
+                return (
+                <div className="space-y-3">
+                  {visibleProofs.map((p) => {
+                    const vr = verifyResults[p.id];
+                    return (
+                      <div
+                        key={p.id}
+                        className="card p-4"
+                        style={{ border: "1px solid color-mix(in srgb, #6F00FF 20%, transparent)" }}
+                      >
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <p
+                                className="text-xs font-mono uppercase tracking-wider"
+                                style={{ color: "#6F00FF" }}
+                              >
+                                {p.period_from} → {p.period_to}
+                              </p>
+                              <span
+                                className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                                style={{ background: "color-mix(in srgb, #6F00FF 15%, transparent)", color: "#6F00FF" }}
+                              >
+                                ZK Groth16
+                              </span>
+                            </div>
+
+                            {/* VAT row */}
+                            <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs mt-2" style={{ color: "var(--text-dim)" }}>
+                              <span>TVA colectat: <strong style={{ color: "var(--text)" }}>{formatRON(p.vat_colectat)}</strong></span>
+                              <span>TVA deductibil: <strong style={{ color: "var(--text)" }}>{formatRON(p.vat_deductibil)}</strong></span>
+                              <span>TVA net: <strong style={{ color: parseFloat(p.vat_net) >= 0 ? "var(--amber)" : "var(--green)" }}>{formatRON(p.vat_net)}</strong></span>
+                            </div>
+
+                            {/* Tax obligations row */}
+                            <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                              {p.entity_type === "PF" ? (
+                                <>
+                                  <span>CAS: <strong style={{ color: "var(--text)" }}>{formatRON(p.cas)}</strong></span>
+                                  <span>CASS: <strong style={{ color: "var(--text)" }}>{formatRON(p.cass)}</strong></span>
+                                  <span>Impozit venit: <strong style={{ color: "var(--text)" }}>{formatRON(p.impozit_venit)}</strong></span>
+                                </>
+                              ) : (
+                                <span>Impozit profit: <strong style={{ color: "var(--text)" }}>{formatRON(p.impozit_profit)}</strong></span>
+                              )}
+                              <span className="font-semibold" style={{ color: "var(--amber)" }}>
+                                Total obligații: <strong>{formatRON(p.total_obligatii)}</strong>
+                              </span>
+                            </div>
+
+                            {/* ZK verify result */}
+                            {vr && (
+                              <div
+                                className="mt-2 text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
+                                style={{
+                                  background: vr.valid
+                                    ? "color-mix(in srgb, var(--green) 10%, transparent)"
+                                    : "color-mix(in srgb, var(--red) 10%, transparent)",
+                                  color: vr.valid ? "var(--green)" : "var(--red)",
+                                }}
+                              >
+                                {vr.valid ? "✓ Dovadă ZK validă" : "✗ Dovadă ZK invalidă"}
+                                <span style={{ color: "var(--text-dim)" }}>
+                                  — verificat {new Date(vr.verified_at).toLocaleTimeString("ro-RO")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col gap-2 items-end shrink-0">
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${p.tx_hash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-mono px-3 py-1.5 rounded-lg"
+                              style={{
+                                background: "color-mix(in srgb, var(--blue) 10%, transparent)",
+                                color: "var(--blue)",
+                                border: "1px solid color-mix(in srgb, var(--blue) 25%, transparent)",
+                              }}
+                            >
+                              Etherscan ↗
+                            </a>
+                            {!vr && (
+                              <button
+                                onClick={() => handleVerify(p.id)}
+                                disabled={verifyingId === p.id}
+                                className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all"
+                                style={{
+                                  background: "color-mix(in srgb, #6F00FF 10%, transparent)",
+                                  color: "#6F00FF",
+                                  border: "1px solid color-mix(in srgb, #6F00FF 25%, transparent)",
+                                }}
+                              >
+                                {verifyingId === p.id ? "Verificare..." : "Verifică ZK"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-2 pt-2 flex items-center gap-2 text-xs flex-wrap" style={{ borderTop: "1px solid var(--border)", color: "var(--text-dim)" }}>
+                          <span>Bloc #{p.block_number.toLocaleString("ro-RO")}</span>
+                          <span>·</span>
+                          <span className="font-mono truncate" style={{ maxWidth: "220px" }}>{p.proof_hash}</span>
+                          <span>·</span>
+                          <span>{new Date(p.anchored_at).toLocaleString("ro-RO")}</span>
+                          {p.entity_fiscal_code && (
+                            <>
+                              <span>·</span>
+                              <Link
+                                to={`/profil/${p.entity_fiscal_code}`}
+                                className="underline-offset-2 hover:underline"
+                                style={{ color: "var(--blue)" }}
+                              >
+                                Profil public ↗
+                              </Link>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                );
+              })()}
+            </section>
           </div>
         )}
       </div>

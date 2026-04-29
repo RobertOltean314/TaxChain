@@ -7,4 +7,7 @@ export default defineConfig({
     port: 5173,
     cors: true,
   },
+  resolve: {
+    dedupe: ["wagmi", "viem", "@wagmi/core", "@tanstack/react-query"],
+  },
 });

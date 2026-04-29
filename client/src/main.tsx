@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
-import { mainnet, sepolia } from "wagmi/chains";
+import { sepolia } from "wagmi/chains";
 import {
   getDefaultConfig,
   RainbowKitProvider,
@@ -20,6 +20,7 @@ import { ToastProvider } from "./components/ui/Toast";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 
 // Public
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 
@@ -39,6 +40,11 @@ import { ReportsPage } from "./pages/ReportsPage";
 // Entity management
 import { EntitiesPage } from "./pages/EntitiesPage";
 
+// Public entity compliance profile
+import ProfilePage from "./pages/ProfilePage";
+import AuditorPage from "./pages/AuditorPage";
+import AuditPage from "./pages/AuditPage";
+
 // Admin-only entity management
 import PersoanaFizicaPage from "./pages/PersoanaFizicaPage";
 import PersoanaFizicaFormPage from "./pages/PersoanaFizicaFormPage";
@@ -48,7 +54,7 @@ import PersoanaJuridicaFormPage from "./pages/PersoanaJuridicaFormPage";
 const wagmiConfig = getDefaultConfig({
   appName: "TaxChain",
   projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? "YOUR_PROJECT_ID",
-  chains: [mainnet, sepolia],
+  chains: [sepolia],
 });
 
 const queryClient = new QueryClient();
@@ -60,7 +66,7 @@ createRoot(document.getElementById("root")!).render(
         <QueryClientProvider client={queryClient}>
           <RainbowKitProvider
             theme={darkTheme({
-              accentColor: "#3b82f6",
+              accentColor: "#007FFF",
               borderRadius: "medium",
             })}
           >
@@ -71,10 +77,9 @@ createRoot(document.getElementById("root")!).render(
                   <Routes>
                     {/* ── Public ─────────────────────────────────────────── */}
                     <Route path="/login" element={<LoginPage />} />
-                    <Route
-                      path="/unauthorized"
-                      element={<UnauthorizedPage />}
-                    />
+                    <Route path="/unauthorized" element={<UnauthorizedPage />} />
+                    {/* Public entity compliance profile — no auth required */}
+                    <Route path="/profil/:fiscalCode" element={<ProfilePage />} />
 
                     {/* ── Onboarding (authenticated but unlinked Taxpayer) ─ */}
                     <Route element={<ProtectedRoute />}>
@@ -106,6 +111,12 @@ createRoot(document.getElementById("root")!).render(
 
                       {/* Reports */}
                       <Route path="/reports" element={<ReportsPage />} />
+
+                      {/* Auditor dashboard (Admin + Auditor see all proofs) */}
+                      <Route path="/panou-auditor" element={<AuditorPage />} />
+
+                      {/* Audit log (Admin + Auditor) */}
+                      <Route path="/jurnal-audit" element={<AuditPage />} />
                     </Route>
 
                     {/* ── Admin + Taxpayer: create & edit ────────────────── */}
@@ -170,15 +181,11 @@ createRoot(document.getElementById("root")!).render(
                       />
                     </Route>
 
+                    {/* ── Landing (public) ───────────────────────────────── */}
+                    <Route path="/" element={<LandingPage />} />
+
                     {/* ── Fallback ────────────────────────────────────────── */}
-                    <Route
-                      path="/"
-                      element={<Navigate to="/dashboard" replace />}
-                    />
-                    <Route
-                      path="*"
-                      element={<Navigate to="/dashboard" replace />}
-                    />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </BrowserRouter>
               </ToastProvider>

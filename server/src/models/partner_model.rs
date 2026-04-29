@@ -99,6 +99,10 @@ pub struct PartnerRequest {
     pub persoana_juridica_id: Option<Uuid>,
 }
 
+fn normalize_iban(iban: &str) -> String {
+    iban.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_uppercase()
+}
+
 impl Partner {
     pub fn from_request(
         req: PartnerRequest,
@@ -120,7 +124,7 @@ impl Partner {
             tara: req.tara.unwrap_or_else(|| "Romania".to_string()),
             email: req.email,
             telefon: req.telefon,
-            iban: req.iban,
+            iban: req.iban.as_deref().map(normalize_iban),
             persoana_fizica_id: req.persoana_fizica_id,
             persoana_juridica_id: req.persoana_juridica_id,
             owner_pf_id,
@@ -146,7 +150,7 @@ impl Partner {
             tara: req.tara.unwrap_or_else(|| existing.tara.clone()),
             email: req.email,
             telefon: req.telefon,
-            iban: req.iban,
+            iban: req.iban.as_deref().map(normalize_iban),
             persoana_fizica_id: req.persoana_fizica_id,
             persoana_juridica_id: req.persoana_juridica_id,
             owner_pf_id: existing.owner_pf_id,

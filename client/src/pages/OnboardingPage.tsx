@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../auth/useAuth";
+import { useEntity } from "../auth/useEntity";
 import { authApi } from "../api/auth.api";
 import { persoanaFizicaApi } from "../api/persoanaFizica.api";
 import { persoanaJuridicaApi } from "../api/persoanaJuridica.api";
@@ -428,6 +429,7 @@ export function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { applyTokens } = useAuth();
+  const { addEntity, setActiveEntity } = useEntity();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -435,22 +437,20 @@ export function OnboardingPage() {
     setIsSubmitting(true);
     try {
       const created = await persoanaFizicaApi.create(values);
-      const tokens = await authApi.linkEntity({
-        persoana_fizica_id: created.id,
-      });
-
+      const tokens = await authApi.linkEntity({ persoana_fizica_id: created.id });
       applyTokens(tokens);
-
-      // Fixed: simple string for success
+      // Register in accountant_entity so the entity gate passes immediately
+      await addEntity("PF", created.id);
+      setActiveEntity({
+        id: created.id,
+        type: "PF",
+        name: `${values.prenume} ${values.nume}`,
+        fiscalCode: values.cnp,
+      });
       toast("Cont creat cu succes! Bun venit în TaxChain.");
-
       navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Eroare la crearea contului";
-
-      // Fixed: simple string for error (or use "Eroare: " + msg)
-      toast(msg);
+      toast(err instanceof Error ? err.message : "Eroare la crearea contului");
     } finally {
       setIsSubmitting(false);
     }
@@ -460,19 +460,19 @@ export function OnboardingPage() {
     setIsSubmitting(true);
     try {
       const created = await persoanaJuridicaApi.create(values);
-      const tokens = await authApi.linkEntity({
-        persoana_juridica_id: created.id,
-      });
-
+      const tokens = await authApi.linkEntity({ persoana_juridica_id: created.id });
       applyTokens(tokens);
-
+      await addEntity("PJ", created.id);
+      setActiveEntity({
+        id: created.id,
+        type: "PJ",
+        name: values.denumire,
+        fiscalCode: values.cod_fiscal,
+      });
       toast("Cont creat cu succes! Bun venit în TaxChain.");
-
       navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Eroare la crearea contului";
-      toast(msg);
+      toast(err instanceof Error ? err.message : "Eroare la crearea contului");
     } finally {
       setIsSubmitting(false);
     }

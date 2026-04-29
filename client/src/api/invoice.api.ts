@@ -87,4 +87,11 @@ export const invoiceApi = {
     );
     return data;
   },
+
+  anchor: async (
+    id: string,
+  ): Promise<{ tx_hash: string; block_number: number; etherscan_url: string }> => {
+    const { data } = await api.post(`/factura/${id}/anchor`);
+    return data;
+  },
 };

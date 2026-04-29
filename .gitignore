@@ -52,4 +52,13 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+/server/.env
+/server/.env.local
+/client/.env
+/client/.env.local
 CLAUDE.md
+
+# Foundry
+/contracts/out/
+/contracts/cache/
+/contracts/.env

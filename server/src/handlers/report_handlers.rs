@@ -53,7 +53,7 @@ pub async fn get_vat_summary(
 ) -> impl Responder {
     if let Err(r) = require_role(
         &req,
-        &[UserRole::Admin, UserRole::Taxpayer, UserRole::Auditor],
+        &[UserRole::Admin, UserRole::Taxpayer],
     ) {
         return r;
     }

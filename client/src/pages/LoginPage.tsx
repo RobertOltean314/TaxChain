@@ -34,21 +34,27 @@ export default function LoginPage() {
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: "var(--bg)" }}
     >
-      {/* subtle grid */}
+      {/* subtle dot grid */}
       <div
-        className="absolute inset-0 opacity-[0.03]"
+        className="absolute inset-0 opacity-[0.025]"
         style={{
-          backgroundImage:
-            "linear-gradient(var(--amber) 1px, transparent 1px), linear-gradient(90deg, var(--amber) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
+          backgroundImage: "radial-gradient(circle, var(--blue) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
+      {/* ambient glow */}
+      <div
+        className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, color-mix(in srgb, var(--violet) 10%, transparent), transparent 70%)",
+          filter: "blur(60px)",
         }}
       />
 
       <div className="relative w-full max-w-sm mx-4 fade-up">
         <div className="text-center mb-10">
           <h1
-            className="font-display text-6xl mb-2"
-            style={{ color: "var(--amber)" }}
+            className="font-display text-6xl font-bold mb-2 text-gradient"
           >
             TaxChain
           </h1>
@@ -62,7 +68,11 @@ export default function LoginPage() {
 
         <div
           className="rounded-2xl border p-8 space-y-6"
-          style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+          style={{
+            background: "var(--bg-card)",
+            borderColor: "var(--border)",
+            boxShadow: "var(--shadow-lg)",
+          }}
         >
           <div>
             <p

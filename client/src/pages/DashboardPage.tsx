@@ -4,8 +4,10 @@ import { useAuth } from "../auth/useAuth";
 import { invoiceApi } from "../api/invoice.api";
 import { partnerApi } from "../api/partner.api";
 import { bnrApi } from "../api/bnr.api";
+import { proofApi } from "../api/proof.api";
+import { auditApi } from "../api/audit.api";
 import { AppLayout } from "../components/ui/AppLayout";
-import type { Invoice, InvoiceStatus, Partner } from "../types";
+import type { Invoice, InvoiceStatus, Partner, FiscalProof } from "../types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -111,36 +113,53 @@ function StatCard({
   index?: number;
 }) {
   const animated = useCountUp(rawValue ?? 0);
-  const shown =
-    displayValue !== undefined
-      ? displayValue
-      : rawValue !== undefined
-        ? currency
-          ? formatRON(animated)
-          : String(Math.round(animated))
-        : "—";
+
+  // For currency values split the formatted number from the "RON" suffix
+  // so the number can shrink/truncate independently of the unit label.
+  let mainNumber: string;
+  let unit: string | null = null;
+
+  if (displayValue !== undefined) {
+    mainNumber = displayValue;
+  } else if (rawValue !== undefined) {
+    if (currency) {
+      mainNumber = new Intl.NumberFormat("ro-RO", { maximumFractionDigits: 0 }).format(animated);
+      unit = "RON";
+    } else {
+      mainNumber = String(Math.round(animated));
+    }
+  } else {
+    mainNumber = "—";
+  }
 
   const color = ACCENT_COLORS[accent];
 
   const content = (
     <div
-      className="card card-interactive p-5 fade-up"
+      className="card card-interactive p-4 fade-up min-w-0 overflow-hidden"
       style={{ animationDelay: `${index * 55}ms` }}
     >
       <p
-        className="text-xs font-mono uppercase tracking-wider mb-3"
+        className="text-[10px] font-mono uppercase tracking-wider mb-2 truncate"
         style={{ color: "var(--text-dim)" }}
       >
         {label}
       </p>
-      <p
-        className="font-display text-2xl font-bold tracking-tight number-in"
-        style={{ color, animationDelay: `${index * 55 + 150}ms` }}
-      >
-        {shown}
-      </p>
+      <div className="flex items-baseline gap-1.5 min-w-0 overflow-hidden">
+        <span
+          className="font-display text-xl font-bold tracking-tight number-in truncate"
+          style={{ color, animationDelay: `${index * 55 + 150}ms` }}
+        >
+          {mainNumber}
+        </span>
+        {unit && (
+          <span className="text-[11px] font-mono shrink-0" style={{ color: "var(--text-dim)" }}>
+            {unit}
+          </span>
+        )}
+      </div>
       {sub && (
-        <p className="text-xs mt-1.5" style={{ color: "var(--text-dim)" }}>
+        <p className="text-[11px] mt-1 truncate" style={{ color: "var(--text-dim)" }}>
           {sub}
         </p>
       )}
@@ -148,7 +167,7 @@ function StatCard({
   );
 
   return to ? (
-    <Link to={to} className="block">
+    <Link to={to} className="block min-w-0">
       {content}
     </Link>
   ) : (
@@ -214,13 +233,32 @@ const FALLBACK_USD = 4.6;
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const isAuditor = user?.role === "Auditor";
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [eurRate, setEurRate] = useState(FALLBACK_EUR);
   const [usdRate, setUsdRate] = useState(FALLBACK_USD);
 
+  // Auditor-specific state
+  const [proofs, setProofs] = useState<FiscalProof[]>([]);
+  const [auditCount, setAuditCount] = useState(0);
+
   useEffect(() => {
+    if (isAuditor) {
+      // Auditors don't have access to invoices/partners endpoints — load auditor data instead
+      Promise.all([
+        proofApi.listAll({}).catch(() => [] as FiscalProof[]),
+        auditApi.getLog({ limit: 1 }).catch(() => []),
+      ]).then(([proofsData]) => {
+        setProofs(proofsData);
+      }).finally(() => setIsLoading(false));
+      // Fetch audit count separately (just load a small batch to count)
+      auditApi.getLog({ limit: 500 }).then((entries) => setAuditCount(entries.length)).catch(() => {});
+      return;
+    }
+
     (async () => {
       try {
         const [invs, partnerList] = await Promise.all([
@@ -239,7 +277,7 @@ export function DashboardPage() {
     // Fetch today's BNR rates — failures fall back to hardcoded approximations
     bnrApi.getRate("EUR").then((r) => setEurRate(parseFloat(r.rate))).catch(() => {});
     bnrApi.getRate("USD").then((r) => setUsdRate(parseFloat(r.rate))).catch(() => {});
-  }, []);
+  }, [isAuditor]);
 
   function toRON(amount: number, currency: string): number {
     if (currency === "EUR") return amount * eurRate;
@@ -296,6 +334,66 @@ export function DashboardPage() {
     return "Bună seara";
   })();
 
+  // ── Auditor-specific dashboard ─────────────────────────────────────────────
+  if (isAuditor) {
+    return (
+      <AppLayout>
+        <div className="w-full max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-8 fade-up">
+            <p className="text-sm font-mono mb-1" style={{ color: "var(--text-dim)" }}>
+              {(() => { const h = new Date().getHours(); return h < 12 ? "Bună dimineața" : h < 18 ? "Bună ziua" : "Bună seara"; })()},
+            </p>
+            <h1 className="font-display text-3xl" style={{ color: "var(--text)" }}>
+              {user?.display_name ?? user?.email ?? "Auditor"}
+            </h1>
+            <p className="text-sm mt-1 font-mono" style={{ color: "var(--blue)" }}>Auditor ANAF</p>
+          </div>
+
+          {/* Auditor stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+            {[
+              { label: "Dovezi ZK în sistem", value: isLoading ? "…" : String(proofs.length), color: "var(--violet)", to: "/panou-auditor" },
+              { label: "Evenimente audit", value: auditCount > 0 ? String(auditCount) : "…", color: "var(--blue)", to: "/jurnal-audit" },
+              { label: "Entități conforme", value: isLoading ? "…" : String(new Set(proofs.map(p => p.entity_fiscal_code)).size), color: "var(--green)", to: "/panou-auditor" },
+            ].map(({ label, value, color, to }) => (
+              <Link key={label} to={to} className="block min-w-0">
+                <div className="card card-interactive p-4 fade-up min-w-0 overflow-hidden">
+                  <p className="text-[10px] font-mono uppercase tracking-wider mb-2 truncate" style={{ color: "var(--text-dim)" }}>
+                    {label}
+                  </p>
+                  <p className="font-display text-2xl font-bold tracking-tight" style={{ color }}>{value}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Quick links */}
+          <div className="card p-6 mb-6 fade-up" style={{ animationDelay: "120ms" }}>
+            <p className="text-xs font-mono uppercase tracking-wider mb-4" style={{ color: "var(--text-dim)" }}>Acces rapid</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Link to="/panou-auditor" className="flex items-center gap-3 rounded-xl p-4 transition-colors"
+                style={{ background: "color-mix(in srgb, var(--violet) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--violet) 20%, transparent)" }}>
+                <span className="text-xl">⬕</span>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Panou Auditor</p>
+                  <p className="text-xs" style={{ color: "var(--text-dim)" }}>Verificare dovezi ZK Groth16</p>
+                </div>
+              </Link>
+              <Link to="/jurnal-audit" className="flex items-center gap-3 rounded-xl p-4 transition-colors"
+                style={{ background: "color-mix(in srgb, var(--blue) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--blue) 20%, transparent)" }}>
+                <span className="text-xl">◎</span>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Jurnal Audit</p>
+                  <p className="text-xs" style={{ color: "var(--text-dim)" }}>Istoricul acțiunilor din sistem</p>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="w-full max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
@@ -330,7 +428,7 @@ export function DashboardPage() {
 
         {/* Metric cards */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
             {Array.from({ length: 7 }).map((_, i) => (
               <div key={i} className="card p-5">
                 <div className="h-3 rounded shimmer mb-3 w-24" />
@@ -340,7 +438,7 @@ export function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
             <StatCard
               label="De încasat"
               rawValue={totalReceivables}

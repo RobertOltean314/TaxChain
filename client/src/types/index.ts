@@ -42,6 +42,23 @@ export const ALL_STATUSES: InvoiceStatus[] = [
 ];
 
 // ============================================================================
+// AUDIT
+// ============================================================================
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  actor_user_id: string;
+  actor_name: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  resource_type: string;
+  resource_id: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+// ============================================================================
 // AUTH
 // ============================================================================
 
@@ -237,9 +254,51 @@ export interface Invoice {
   created_by: string;
   created_at: string;
   updated_at: string;
+  tx_hash: string | null;
+  block_number: number | null;
+  anchored_at: string | null;
 }
 
 export interface InvoiceWithLines {
   invoice: Invoice;
   lines: InvoiceLine[];
 }
+
+export interface FiscalProof {
+  id: string;
+  user_id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  entity_fiscal_code: string;
+  period_from: string;
+  period_to: string;
+
+  // VAT
+  vat_colectat: string;
+  vat_deductibil: string;
+  vat_net: string;
+
+  // Revenue / expense totals
+  venituri_brute: string;
+  cheltuieli_brute: string;
+
+  // Tax obligations
+  cas: string;
+  cass: string;
+  impozit_venit: string;
+  impozit_profit: string;
+  total_obligatii: string;
+
+  // Anchoring
+  proof_hash: string;
+  period_hash: string;
+  tx_hash: string;
+  block_number: number;
+  anchored_at: string;
+  created_at: string;
+
+  // ZK flag
+  is_zk: boolean;
+}
+

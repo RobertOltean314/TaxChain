@@ -5,6 +5,9 @@ import type { UserResponse } from "../types";
 
 const ENTITY_EXEMPT_PATHS = ["/entities", "/onboarding", "/login", "/unauthorized"];
 
+// Paths that Auditors are allowed to access
+const AUDITOR_ALLOWED_PATHS = ["/dashboard", "/panou-auditor", "/jurnal-audit", "/profil"];
+
 interface ProtectedRouteProps {
   allowedRoles?: UserResponse["role"][];
 }
@@ -39,6 +42,17 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Auditor gate: Auditors can only access their allowed paths
+  if (user.role === "Auditor") {
+    const isAuditorAllowed = AUDITOR_ALLOWED_PATHS.some((p) =>
+      location.pathname.startsWith(p),
+    );
+    if (!isAuditorAllowed) {
+      return <Navigate to="/panou-auditor" replace />;
+    }
+    return <Outlet />;
   }
 
   // Onboarding gate: Taxpayer with no linked entity must complete onboarding

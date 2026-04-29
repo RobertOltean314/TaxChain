@@ -9,25 +9,34 @@ services:
       - "5432:5432"
     volumes:
       - ./server/migrations:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 5
+
   server:
     build: ./server
     env_file:
-      - .env
+      - ./server/.env
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - zk_keys:/app/zk_keys
+
   client:
     build: ./client
     env_file:
-      - .env
+      - ./client/.env
     ports:
       - "5173:5173"
     depends_on:
       - server
+
+volumes:
+  pgdata:
+  zk_keys:

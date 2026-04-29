@@ -8,7 +8,7 @@ use crate::models::UserRole;
 use crate::services::entity_service::DynEntityRepository;
 
 fn user_id_from_req(req: &HttpRequest) -> Result<Uuid, HttpResponse> {
-    let user = require_role(req, &[UserRole::Admin, UserRole::Taxpayer, UserRole::Auditor])
+    let user = require_role(req, &[UserRole::Admin, UserRole::Taxpayer])
         .map_err(|r| r)?;
     user.claims()
         .user_id()

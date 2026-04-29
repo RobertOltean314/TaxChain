@@ -25,10 +25,11 @@ const validateCNP = (cnp: string): boolean => {
 };
 
 const validateIBAN = (iban: string): boolean => {
-  if (!/^RO\d{2}[A-Z]{4}[A-Z0-9]{16}$/.test(iban)) return false;
+  const clean = iban.replace(/\s+/g, "").toUpperCase();
+  if (!/^RO\d{2}[A-Z]{4}[A-Z0-9]{16}$/.test(clean)) return false;
 
   // IBAN mod-97 checksum
-  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  const rearranged = clean.slice(4) + clean.slice(0, 4);
   const numeric = rearranged
     .split("")
     .map((c) => {
@@ -341,16 +342,14 @@ export const invoiceSchema = z.object({
     .default("TaxInvoice"),
   transaction_type: z.enum(["Income", "Expense"]).optional().nullable(),
   issued_date: pastDateOrToday,
-  due_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data scadenței trebuie în format YYYY-MM-DD")
-    .optional()
-    .nullable(),
-  delivery_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data livrării trebuie în format YYYY-MM-DD")
-    .optional()
-    .nullable(),
+  due_date: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data scadenței trebuie în format YYYY-MM-DD").optional().nullable()
+  ),
+  delivery_date: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data livrării trebuie în format YYYY-MM-DD").optional().nullable()
+  ),
   issuer_pf_id: z.string().uuid("ID invalid").optional().nullable(),
   issuer_pj_id: z.string().uuid("ID invalid").optional().nullable(),
   partner_id: z.string().uuid("Partenul este obligatoriu"),

@@ -146,6 +146,11 @@ pub struct Invoice {
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+
+    // Blockchain anchoring (Phase 10) — None until anchored
+    pub tx_hash: Option<String>,
+    pub block_number: Option<i64>,
+    pub anchored_at: Option<DateTime<Utc>>,
 }
 
 // ============================================================================
@@ -301,6 +306,9 @@ impl Invoice {
             created_by,
             created_at: now,
             updated_at: now,
+            tx_hash: None,
+            block_number: None,
+            anchored_at: None,
         }
     }
 
@@ -335,7 +343,119 @@ impl Invoice {
             created_by: existing.created_by,
             created_at: existing.created_at,
             updated_at: now,
+            tx_hash: existing.tx_hash.clone(),
+            block_number: existing.block_number,
+            anchored_at: existing.anchored_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use rust_decimal::Decimal;
+    use uuid::Uuid;
+
+    fn base_line() -> InvoiceLine {
+        InvoiceLine {
+            id: Uuid::new_v4(),
+            invoice_id: Uuid::new_v4(),
+            position: 1,
+            description: "Test".to_string(),
+            product_code: None,
+            unit: "pcs".to_string(),
+            quantity: Decimal::ZERO,
+            unit_price: Decimal::ZERO,
+            discount_percent: Decimal::ZERO,
+            vat_rate: VatRate::Standard,
+            line_subtotal: Decimal::ZERO,
+            line_vat: Decimal::ZERO,
+            line_total: Decimal::ZERO,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn valid_status_transitions() {
+        let valid = [
+            (InvoiceStatus::Draft, InvoiceStatus::Issued),
+            (InvoiceStatus::Draft, InvoiceStatus::Cancelled),
+            (InvoiceStatus::Issued, InvoiceStatus::Sent),
+            (InvoiceStatus::Issued, InvoiceStatus::Cancelled),
+            (InvoiceStatus::Sent, InvoiceStatus::Paid),
+            (InvoiceStatus::Sent, InvoiceStatus::Cancelled),
+        ];
+        for (from, to) in valid {
+            assert!(from.can_transition_to(to), "{from:?} → {to:?} should be valid");
+        }
+    }
+
+    #[test]
+    fn invalid_status_transitions() {
+        let invalid = [
+            (InvoiceStatus::Draft, InvoiceStatus::Sent),
+            (InvoiceStatus::Draft, InvoiceStatus::Paid),
+            (InvoiceStatus::Draft, InvoiceStatus::Draft),
+            (InvoiceStatus::Issued, InvoiceStatus::Draft),
+            (InvoiceStatus::Issued, InvoiceStatus::Paid),
+            (InvoiceStatus::Sent, InvoiceStatus::Draft),
+            (InvoiceStatus::Sent, InvoiceStatus::Issued),
+            (InvoiceStatus::Paid, InvoiceStatus::Draft),
+            (InvoiceStatus::Paid, InvoiceStatus::Issued),
+            (InvoiceStatus::Paid, InvoiceStatus::Sent),
+            (InvoiceStatus::Paid, InvoiceStatus::Cancelled),
+            (InvoiceStatus::Cancelled, InvoiceStatus::Draft),
+            (InvoiceStatus::Cancelled, InvoiceStatus::Issued),
+            (InvoiceStatus::Cancelled, InvoiceStatus::Paid),
+        ];
+        for (from, to) in invalid {
+            assert!(!from.can_transition_to(to), "{from:?} → {to:?} should be invalid");
+        }
+    }
+
+    #[test]
+    fn vat_multipliers() {
+        assert_eq!(VatRate::Standard.multiplier(), Decimal::new(21, 2));
+        assert_eq!(VatRate::Reduced9.multiplier(), Decimal::new(9, 2));
+        assert_eq!(VatRate::Reduced5.multiplier(), Decimal::new(5, 2));
+        assert_eq!(VatRate::Exempt.multiplier(), Decimal::ZERO);
+    }
+
+    #[test]
+    fn recompute_totals_standard_vat() {
+        let mut line = base_line();
+        line.quantity = Decimal::new(2, 0);
+        line.unit_price = Decimal::new(10, 0);
+        line.recompute_totals();
+        assert_eq!(line.line_subtotal, Decimal::new(20, 0));
+        assert_eq!(line.line_vat, Decimal::new(420, 2));   // 4.20
+        assert_eq!(line.line_total, Decimal::new(2420, 2)); // 24.20
+    }
+
+    #[test]
+    fn recompute_totals_with_discount() {
+        let mut line = base_line();
+        line.quantity = Decimal::ONE;
+        line.unit_price = Decimal::new(100, 0);
+        line.discount_percent = Decimal::new(10, 0);
+        line.recompute_totals();
+        assert_eq!(line.line_subtotal, Decimal::new(90, 0));
+        assert_eq!(line.line_vat, Decimal::new(1890, 2));    // 18.90
+        assert_eq!(line.line_total, Decimal::new(10890, 2)); // 108.90
+    }
+
+    #[test]
+    fn recompute_totals_exempt_vat() {
+        let mut line = base_line();
+        line.quantity = Decimal::new(5, 0);
+        line.unit_price = Decimal::new(20, 0);
+        line.vat_rate = VatRate::Exempt;
+        line.recompute_totals();
+        assert_eq!(line.line_subtotal, Decimal::new(100, 0));
+        assert_eq!(line.line_vat, Decimal::ZERO);
+        assert_eq!(line.line_total, Decimal::new(100, 0));
     }
 }
 
