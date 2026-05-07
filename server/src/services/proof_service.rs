@@ -37,6 +37,7 @@ struct ProofRow {
     anchored_at: chrono::DateTime<chrono::Utc>,
     created_at: chrono::DateTime<chrono::Utc>,
     is_zk: bool,
+    circuit_version: Option<String>,
 }
 
 fn row_to_proof(r: ProofRow) -> FiscalProof {
@@ -67,6 +68,7 @@ fn row_to_proof(r: ProofRow) -> FiscalProof {
         anchored_at: r.anchored_at,
         created_at: r.created_at,
         is_zk: r.is_zk,
+        circuit_version: r.circuit_version,
     }
 }
 
@@ -109,6 +111,7 @@ impl ProofRepository {
         block_number: i64,
         is_zk: bool,
         zk_proof_bytes: Option<Vec<u8>>,
+        circuit_version: Option<&str>,
     ) -> Result<FiscalProof, sqlx::Error> {
         let row: ProofRow = sqlx::query_as(
             r#"
@@ -119,14 +122,14 @@ impl ProofRepository {
                 venituri_brute, cheltuieli_brute,
                 cas, cass, impozit_venit, impozit_profit, total_obligatii,
                 proof_hash, period_hash, tx_hash, block_number,
-                is_zk, zk_proof_bytes
+                is_zk, zk_proof_bytes, circuit_version
             ) VALUES (
                 $1,$2,$3,$4,$5,$6,$7,
                 $8::numeric, $9::numeric, $10::numeric,
                 $11::numeric, $12::numeric,
                 $13::numeric, $14::numeric, $15::numeric, $16::numeric, $17::numeric,
                 $18,$19,$20,$21,
-                $22,$23
+                $22,$23,$24
             )
             RETURNING
                 id, user_id, entity_type, entity_id,
@@ -137,7 +140,7 @@ impl ProofRepository {
                 cas::text, cass::text, impozit_venit::text,
                 impozit_profit::text, total_obligatii::text,
                 proof_hash, period_hash, tx_hash, block_number,
-                anchored_at, created_at, is_zk
+                anchored_at, created_at, is_zk, circuit_version
             "#,
         )
         .bind(user_id)
@@ -163,6 +166,7 @@ impl ProofRepository {
         .bind(block_number)
         .bind(is_zk)
         .bind(zk_proof_bytes)
+        .bind(circuit_version)
         .fetch_one(&self.pool)
         .await?;
 
@@ -185,7 +189,7 @@ impl ProofRepository {
                 cas::text, cass::text, impozit_venit::text,
                 impozit_profit::text, total_obligatii::text,
                 proof_hash, period_hash, tx_hash, block_number,
-                anchored_at, created_at, is_zk
+                anchored_at, created_at, is_zk, circuit_version
             FROM dovada_fiscala
             WHERE entity_type = $1 AND entity_id = $2
             ORDER BY period_from DESC, created_at DESC
@@ -219,7 +223,7 @@ impl ProofRepository {
                 cas::text, cass::text, impozit_venit::text,
                 impozit_profit::text, total_obligatii::text,
                 proof_hash, period_hash, tx_hash, block_number,
-                anchored_at, created_at, is_zk
+                anchored_at, created_at, is_zk, circuit_version
             FROM dovada_fiscala
             WHERE ($1::text IS NULL OR entity_fiscal_code ILIKE '%' || $1 || '%')
               AND ($2::text IS NULL OR entity_type = $2)
@@ -255,7 +259,7 @@ impl ProofRepository {
                 cas::text, cass::text, impozit_venit::text,
                 impozit_profit::text, total_obligatii::text,
                 proof_hash, period_hash, tx_hash, block_number,
-                anchored_at, created_at, is_zk
+                anchored_at, created_at, is_zk, circuit_version
             FROM dovada_fiscala
             WHERE entity_fiscal_code = $1
             ORDER BY period_from DESC, created_at DESC
@@ -287,7 +291,7 @@ impl ProofRepository {
                 cas::text, cass::text, impozit_venit::text,
                 impozit_profit::text, total_obligatii::text,
                 proof_hash, period_hash, tx_hash, block_number,
-                anchored_at, created_at, is_zk,
+                anchored_at, created_at, is_zk, circuit_version,
                 zk_proof_bytes
             FROM dovada_fiscala
             WHERE id = $1
@@ -328,6 +332,7 @@ impl ProofRepository {
                 anchored_at: r.get("anchored_at"),
                 created_at: r.get("created_at"),
                 is_zk: r.get("is_zk"),
+                circuit_version: r.get("circuit_version"),
             };
             let zk_bytes: Option<Vec<u8>> = r.get("zk_proof_bytes");
             Ok(Some((proof, zk_bytes)))

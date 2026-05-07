@@ -9,6 +9,7 @@ RUN cargo build --release
 RUN rm -rf src
 
 COPY src ./src
+COPY migrations ./migrations
 
 RUN cargo build --release
 

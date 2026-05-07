@@ -7,7 +7,8 @@
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(cargo test *)",
       "Bash(grep -E \"^test |FAILED|passed|failed|ok$|FAILED$\")",
-      "Read(//home/robert/Desktop/work/programming/university/**)"
+      "Read(//home/robert/Desktop/work/programming/university/**)",
+      "Bash(curl -sk --max-time 8 \"https://www.bnr.ro/nbrfxrates.xml\")"
     ]
   }
 }

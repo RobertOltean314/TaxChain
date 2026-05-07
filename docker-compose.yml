@@ -26,7 +26,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - zk_keys:/app/zk_keys
+      - ./server/zk_keys:/app/zk_keys
 
   client:
     build: ./client
@@ -39,4 +39,3 @@ services:
 
 volumes:
   pgdata:
-  zk_keys:

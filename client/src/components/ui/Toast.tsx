@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 
 type Kind = "ok" | "err" | "info";
 interface T { id: number; msg: string; kind: Kind; }
-interface Ctx { toast: (msg: string, kind?: Kind) => void; }
+interface Ctx { toast: (msg: string, kind?: Kind, duration?: number) => void; }
 
 export const ToastCtx = createContext<Ctx>({} as Ctx);
 export const useToast = () => useContext(ToastCtx);
@@ -19,10 +19,10 @@ const ICON: Record<Kind, string> = { ok: "✓", err: "✕", info: "◆" };
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, set] = useState<T[]>([]);
 
-  const toast = useCallback((msg: string, kind: Kind = "info") => {
+  const toast = useCallback((msg: string, kind: Kind = "info", duration = 4000) => {
     const id = ++_n;
     set((p) => [...p, { id, msg, kind }]);
-    setTimeout(() => set((p) => p.filter((t) => t.id !== id)), 4000);
+    setTimeout(() => set((p) => p.filter((t) => t.id !== id)), duration);
   }, []);
 
   return (

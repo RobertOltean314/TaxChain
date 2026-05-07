@@ -40,4 +40,7 @@ pub struct FiscalProof {
 
     // ZK flag
     pub is_zk: bool,
+    /// Identifies the circuit whose keys were used to generate this proof.
+    /// NULL for proofs created before circuit versioning was introduced (legacy — cannot be re-verified).
+    pub circuit_version: Option<String>,
 }

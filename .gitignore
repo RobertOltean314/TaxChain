@@ -53,6 +53,7 @@ Thumbs.db
 .env.local
 .env.*.local
 /server/.env
+/server/zk_keys/
 /server/.env.local
 /client/.env
 /client/.env.local

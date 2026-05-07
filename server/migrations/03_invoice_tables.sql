@@ -4,44 +4,23 @@
 -- ============================================================================
 
 -- ENUMS
-CREATE TYPE tip_document AS ENUM (
-    'FiscalA',
-    'ProformA',
-    'NotaDeCredit',
-    'Chitanta',
-    'AvizDeExpeditie'
-);
+DO $$ BEGIN CREATE TYPE tip_document AS ENUM ('FiscalA', 'ProformA', 'NotaDeCredit', 'Chitanta', 'AvizDeExpeditie');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE stare_factura AS ENUM (
-    'Draft',
-    'Emisa',
-    'Trimisa',
-    'Platita',
-    'Anulata'
-);
+DO $$ BEGIN CREATE TYPE stare_factura AS ENUM ('Draft', 'Emisa', 'Trimisa', 'Platita', 'Anulata');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE tip_partener AS ENUM (
-    'Client',
-    'Furnizor',
-    'Ambele'
-);
+DO $$ BEGIN CREATE TYPE tip_partener AS ENUM ('Client', 'Furnizor', 'Ambele');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE tip_entitate AS ENUM (
-    'PersoanaFizica',
-    'PersoanaJuridica'
-);
+DO $$ BEGIN CREATE TYPE tip_entitate AS ENUM ('PersoanaFizica', 'PersoanaJuridica');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE cota_tva AS ENUM (
-    'Standard',
-    'Redusa9',
-    'Redusa5',
-    'Scutit'
-);
+DO $$ BEGIN CREATE TYPE cota_tva AS ENUM ('Standard', 'Redusa9', 'Redusa5', 'Scutit');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE tip_tranzactie AS ENUM (
-    'Venit',
-    'Cheltuiala'
-);
+DO $$ BEGIN CREATE TYPE tip_tranzactie AS ENUM ('Venit', 'Cheltuiala');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- PARTENER TABLE
 CREATE TABLE IF NOT EXISTS partener (
@@ -169,14 +148,14 @@ CREATE TABLE IF NOT EXISTS factura_linie (
 );
 
 -- INDEXES
-CREATE INDEX idx_partener_created_by    ON partener(created_by);
-CREATE INDEX idx_partener_cod_fiscal    ON partener(cod_fiscal) WHERE cod_fiscal IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_partener_created_by    ON partener(created_by);
+CREATE INDEX IF NOT EXISTS idx_partener_cod_fiscal    ON partener(cod_fiscal) WHERE cod_fiscal IS NOT NULL;
 
-CREATE INDEX idx_factura_emitent_pf     ON factura(emitent_pf_id) WHERE emitent_pf_id IS NOT NULL;
-CREATE INDEX idx_factura_emitent_pj     ON factura(emitent_pj_id) WHERE emitent_pj_id IS NOT NULL;
-CREATE INDEX idx_factura_partener_id    ON factura(partener_id);
-CREATE INDEX idx_factura_stare          ON factura(stare);
-CREATE INDEX idx_factura_data_emitere   ON factura(data_emitere DESC);
-CREATE INDEX idx_factura_created_by     ON factura(created_by);
+CREATE INDEX IF NOT EXISTS idx_factura_emitent_pf     ON factura(emitent_pf_id) WHERE emitent_pf_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_factura_emitent_pj     ON factura(emitent_pj_id) WHERE emitent_pj_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_factura_partener_id    ON factura(partener_id);
+CREATE INDEX IF NOT EXISTS idx_factura_stare          ON factura(stare);
+CREATE INDEX IF NOT EXISTS idx_factura_data_emitere   ON factura(data_emitere DESC);
+CREATE INDEX IF NOT EXISTS idx_factura_created_by     ON factura(created_by);
 
-CREATE INDEX idx_factura_linie_factura_id ON factura_linie(factura_id);
+CREATE INDEX IF NOT EXISTS idx_factura_linie_factura_id ON factura_linie(factura_id);

@@ -2,7 +2,8 @@
 -- ANAF MOCK SERVER TABLE
 -- ============================================================================
 
-CREATE TYPE efactura_status AS ENUM ('processing', 'ok', 'error');
+DO $$ BEGIN CREATE TYPE efactura_status AS ENUM ('processing', 'ok', 'error');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS efactura_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

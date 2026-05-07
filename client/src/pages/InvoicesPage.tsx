@@ -278,10 +278,12 @@ export function InvoicesPage() {
                         <td className="px-4 py-3.5">
                           <p className="font-mono text-xs font-semibold" style={{ color: "var(--text)" }}>
                             {inv.number}
-                            {inv.tx_hash && (
+                            {(inv.sent_tx_hash || inv.tx_hash) && (
                               <span
                                 className="ml-1.5 text-[10px]"
-                                title={`Ancorată pe Sepolia · bloc #${inv.block_number}`}
+                                title={inv.tx_hash
+                                  ? `Ancorat la trimitere și la plată · Sepolia`
+                                  : `Ancorat la trimitere · Sepolia bloc #${inv.sent_block_number}`}
                                 style={{ color: "#6F00FF" }}
                               >
                                 ⛓

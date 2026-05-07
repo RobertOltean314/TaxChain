@@ -147,7 +147,11 @@ pub struct Invoice {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 
-    // Blockchain anchoring (Phase 10) — None until anchored
+    // Blockchain anchoring — Sent transition
+    pub sent_tx_hash: Option<String>,
+    pub sent_block_number: Option<i64>,
+    pub sent_anchored_at: Option<DateTime<Utc>>,
+    // Blockchain anchoring — Paid transition
     pub tx_hash: Option<String>,
     pub block_number: Option<i64>,
     pub anchored_at: Option<DateTime<Utc>>,
@@ -306,6 +310,9 @@ impl Invoice {
             created_by,
             created_at: now,
             updated_at: now,
+            sent_tx_hash: None,
+            sent_block_number: None,
+            sent_anchored_at: None,
             tx_hash: None,
             block_number: None,
             anchored_at: None,
@@ -343,6 +350,9 @@ impl Invoice {
             created_by: existing.created_by,
             created_at: existing.created_at,
             updated_at: now,
+            sent_tx_hash: existing.sent_tx_hash.clone(),
+            sent_block_number: existing.sent_block_number,
+            sent_anchored_at: existing.sent_anchored_at,
             tx_hash: existing.tx_hash.clone(),
             block_number: existing.block_number,
             anchored_at: existing.anchored_at,

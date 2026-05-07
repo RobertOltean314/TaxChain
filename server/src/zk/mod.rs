@@ -10,104 +10,244 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_snark::SNARK;
 use ark_std::rand::SeedableRng;
 use ark_std::rand::rngs::StdRng;
+use sha2::{Digest, Sha256};
 
-use circuit::TaxComplianceCircuit;
+use circuit::{PFTaxCircuit, PJTaxCircuit};
 
-const PROVING_KEY_PATH: &str = "zk_keys/proving.key";
-const VERIFYING_KEY_PATH: &str = "zk_keys/verifying.key";
+const PF_PROVING_KEY: &str = "zk_keys/pf_proving.key";
+const PF_VERIFYING_KEY: &str = "zk_keys/pf_verifying.key";
+const PJ_PROVING_KEY: &str = "zk_keys/pj_proving.key";
+const PJ_VERIFYING_KEY: &str = "zk_keys/pj_verifying.key";
+
+pub const PF_CIRCUIT_LABEL: &str = "pf_v2";
+pub const PJ_CIRCUIT_LABEL: &str = "pj_v2";
 
 #[derive(Clone)]
 pub struct ZkService {
-    pub pk: Arc<ProvingKey<Bn254>>,
-    pub pvk: Arc<PreparedVerifyingKey<Bn254>>,
+    pf_pk: Arc<ProvingKey<Bn254>>,
+    pf_pvk: Arc<PreparedVerifyingKey<Bn254>>,
+    pj_pk: Arc<ProvingKey<Bn254>>,
+    pj_pvk: Arc<PreparedVerifyingKey<Bn254>>,
+    pf_vk_fp: String,
+    pj_vk_fp: String,
 }
 
 impl ZkService {
-    /// Load keys from disk, generating them first if they do not exist.
-    /// Key generation takes 10–60 seconds on first run; subsequent loads are instant.
     pub fn load_or_generate() -> Result<Self, Box<dyn std::error::Error>> {
         fs::create_dir_all("zk_keys")?;
 
-        if Path::new(PROVING_KEY_PATH).exists() && Path::new(VERIFYING_KEY_PATH).exists() {
-            println!("[zk] Loading existing keys from zk_keys/");
-            let pk_bytes = fs::read(PROVING_KEY_PATH)?;
-            let vk_bytes = fs::read(VERIFYING_KEY_PATH)?;
-            let pk = ProvingKey::<Bn254>::deserialize_compressed(&*pk_bytes)?;
-            let vk = ark_groth16::VerifyingKey::<Bn254>::deserialize_compressed(&*vk_bytes)?;
-            let pvk = Groth16::<Bn254>::process_vk(&vk)?;
-            println!("[zk] Keys loaded.");
-            return Ok(Self { pk: Arc::new(pk), pvk: Arc::new(pvk) });
-        }
+        let (pf_pk, pf_pvk) = load_or_generate_keys::<PFTaxCircuit<Fr>>(
+            PF_PROVING_KEY,
+            PF_VERIFYING_KEY,
+            "PF",
+            PFTaxCircuit::new_for_setup(),
+        )?;
+        let pf_vk_fp = vk_fingerprint(PF_VERIFYING_KEY)?;
 
-        println!("[zk] No keys found — running trusted setup (this takes ~30 seconds)...");
-        let mut rng = StdRng::from_entropy();
-        let circuit = TaxComplianceCircuit::<Fr>::new_for_setup();
-        let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit, &mut rng)?;
-        let pvk = Groth16::<Bn254>::process_vk(&vk)?;
+        let (pj_pk, pj_pvk) = load_or_generate_keys::<PJTaxCircuit<Fr>>(
+            PJ_PROVING_KEY,
+            PJ_VERIFYING_KEY,
+            "PJ",
+            PJTaxCircuit::new_for_setup(),
+        )?;
+        let pj_vk_fp = vk_fingerprint(PJ_VERIFYING_KEY)?;
 
-        let mut pk_bytes = Vec::new();
-        pk.serialize_compressed(&mut pk_bytes)?;
-        fs::write(PROVING_KEY_PATH, &pk_bytes)?;
+        println!("[zk] PF circuit version: {}_{pf_vk_fp}", PF_CIRCUIT_LABEL);
+        println!("[zk] PJ circuit version: {}_{pj_vk_fp}", PJ_CIRCUIT_LABEL);
 
-        let mut vk_bytes = Vec::new();
-        vk.serialize_compressed(&mut vk_bytes)?;
-        fs::write(VERIFYING_KEY_PATH, &vk_bytes)?;
-
-        println!("[zk] Trusted setup complete. Keys written to zk_keys/");
-        Ok(Self { pk: Arc::new(pk), pvk: Arc::new(pvk) })
+        Ok(Self {
+            pf_pk: Arc::new(pf_pk),
+            pf_pvk: Arc::new(pf_pvk),
+            pj_pk: Arc::new(pj_pk),
+            pj_pvk: Arc::new(pj_pvk),
+            pf_vk_fp,
+            pj_vk_fp,
+        })
     }
 
-    /// Generate a Groth16 proof for the given tax compliance statement.
-    /// Returns serialized proof bytes + the 4 public inputs (scaled u64).
-    pub fn generate_proof(
+    pub fn pf_circuit_version(&self) -> String {
+        format!("{}_{}", PF_CIRCUIT_LABEL, self.pf_vk_fp)
+    }
+
+    pub fn pj_circuit_version(&self) -> String {
+        format!("{}_{}", PJ_CIRCUIT_LABEL, self.pj_vk_fp)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_pf_proof(
         &self,
         income_bases: Vec<u64>,
         income_vats: Vec<u64>,
         expense_bases: Vec<u64>,
         expense_vats: Vec<u64>,
-        venituri_brute_scaled: u64,
-        cheltuieli_brute_scaled: u64,
-        vat_colectat_scaled: u64,
-        vat_deductibil_scaled: u64,
+        venituri_brute: u64,
+        cheltuieli_brute: u64,
+        vat_colectat: u64,
+        vat_deductibil: u64,
+        profit_net: u64,
+        cas: u64,
+        cass: u64,
+        impozit_venit: u64,
     ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let mut rng = StdRng::from_entropy();
-        let circuit = TaxComplianceCircuit::<Fr>::new_for_proving(
+        let circuit = PFTaxCircuit::<Fr>::new_for_proving(
             income_bases,
             income_vats,
             expense_bases,
             expense_vats,
-            venituri_brute_scaled,
-            cheltuieli_brute_scaled,
-            vat_colectat_scaled,
-            vat_deductibil_scaled,
+            venituri_brute,
+            cheltuieli_brute,
+            vat_colectat,
+            vat_deductibil,
+            profit_net,
+            cas,
+            cass,
+            impozit_venit,
         );
-
-        let proof = Groth16::<Bn254>::prove(&self.pk, circuit, &mut rng)?;
-
-        let mut buf = Vec::new();
-        proof.serialize_compressed(&mut buf)?;
-        Ok(buf)
+        serialize_proof(Groth16::<Bn254>::prove(&self.pf_pk, circuit, &mut rng)?)
     }
 
-    /// Verify a serialized proof against public inputs.
-    pub fn verify_proof(
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_pj_proof(
+        &self,
+        income_bases: Vec<u64>,
+        income_vats: Vec<u64>,
+        expense_bases: Vec<u64>,
+        expense_vats: Vec<u64>,
+        venituri_brute: u64,
+        cheltuieli_brute: u64,
+        vat_colectat: u64,
+        vat_deductibil: u64,
+        profit_net: u64,
+        impozit_profit: u64,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let mut rng = StdRng::from_entropy();
+        let circuit = PJTaxCircuit::<Fr>::new_for_proving(
+            income_bases,
+            income_vats,
+            expense_bases,
+            expense_vats,
+            venituri_brute,
+            cheltuieli_brute,
+            vat_colectat,
+            vat_deductibil,
+            profit_net,
+            impozit_profit,
+        );
+        serialize_proof(Groth16::<Bn254>::prove(&self.pj_pk, circuit, &mut rng)?)
+    }
+
+    /// Verify a stored PF proof.
+    #[allow(clippy::too_many_arguments)]
+    pub fn verify_pf_proof(
         &self,
         proof_bytes: &[u8],
-        venituri_brute_scaled: u64,
-        cheltuieli_brute_scaled: u64,
-        vat_colectat_scaled: u64,
-        vat_deductibil_scaled: u64,
+        venituri_brute: u64,
+        cheltuieli_brute: u64,
+        vat_colectat: u64,
+        vat_deductibil: u64,
+        profit_net: u64,
+        cas: u64,
+        cass: u64,
+        impozit_venit: u64,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         let proof = Proof::<Bn254>::deserialize_compressed(proof_bytes)?;
         let public_inputs = vec![
-            Fr::from(venituri_brute_scaled),
-            Fr::from(cheltuieli_brute_scaled),
-            Fr::from(vat_colectat_scaled),
-            Fr::from(vat_deductibil_scaled),
+            Fr::from(venituri_brute),
+            Fr::from(cheltuieli_brute),
+            Fr::from(vat_colectat),
+            Fr::from(vat_deductibil),
+            Fr::from(profit_net),
+            Fr::from(cas),
+            Fr::from(cass),
+            Fr::from(impozit_venit),
         ];
-        let valid = Groth16::<Bn254>::verify_with_processed_vk(&self.pvk, &public_inputs, &proof)?;
-        Ok(valid)
+        Ok(Groth16::<Bn254>::verify_with_processed_vk(
+            &self.pf_pvk,
+            &public_inputs,
+            &proof,
+        )?)
+    }
+
+    /// Verify a stored PJ proof.
+    #[allow(clippy::too_many_arguments)]
+    pub fn verify_pj_proof(
+        &self,
+        proof_bytes: &[u8],
+        venituri_brute: u64,
+        cheltuieli_brute: u64,
+        vat_colectat: u64,
+        vat_deductibil: u64,
+        profit_net: u64,
+        impozit_profit: u64,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let proof = Proof::<Bn254>::deserialize_compressed(proof_bytes)?;
+        let public_inputs = vec![
+            Fr::from(venituri_brute),
+            Fr::from(cheltuieli_brute),
+            Fr::from(vat_colectat),
+            Fr::from(vat_deductibil),
+            Fr::from(profit_net),
+            Fr::from(impozit_profit),
+        ];
+        Ok(Groth16::<Bn254>::verify_with_processed_vk(
+            &self.pj_pvk,
+            &public_inputs,
+            &proof,
+        )?)
     }
 }
 
 pub type DynZkService = Arc<ZkService>;
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+/// First 8 hex characters of SHA-256 over the verifying key file bytes.
+fn vk_fingerprint(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let bytes = fs::read(path)?;
+    let hash = Sha256::digest(&bytes);
+    Ok(hash.iter().take(4).map(|b| format!("{b:02x}")).collect())
+}
+
+fn load_or_generate_keys<C>(
+    proving_path: &str,
+    verifying_path: &str,
+    label: &str,
+    setup_circuit: C,
+) -> Result<(ProvingKey<Bn254>, PreparedVerifyingKey<Bn254>), Box<dyn std::error::Error>>
+where
+    C: ark_relations::r1cs::ConstraintSynthesizer<Fr> + Send,
+{
+    if Path::new(proving_path).exists() && Path::new(verifying_path).exists() {
+        println!("[zk] Loading existing {label} keys from {proving_path}");
+        let pk = ProvingKey::<Bn254>::deserialize_compressed(&*fs::read(proving_path)?)?;
+        let vk = ark_groth16::VerifyingKey::<Bn254>::deserialize_compressed(&*fs::read(
+            verifying_path,
+        )?)?;
+        let pvk = Groth16::<Bn254>::process_vk(&vk)?;
+        println!("[zk] {label} keys loaded.");
+        return Ok((pk, pvk));
+    }
+
+    println!("[zk] No {label} keys found — running trusted setup (~30 s)...");
+    let mut rng = StdRng::from_entropy();
+    let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(setup_circuit, &mut rng)?;
+    let pvk = Groth16::<Bn254>::process_vk(&vk)?;
+
+    let mut pk_bytes = Vec::new();
+    pk.serialize_compressed(&mut pk_bytes)?;
+    fs::write(proving_path, &pk_bytes)?;
+
+    let mut vk_bytes = Vec::new();
+    vk.serialize_compressed(&mut vk_bytes)?;
+    fs::write(verifying_path, &vk_bytes)?;
+
+    println!("[zk] {label} trusted setup complete. Keys written to zk_keys/");
+    Ok((pk, pvk))
+}
+
+fn serialize_proof(proof: Proof<Bn254>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut buf = Vec::new();
+    proof.serialize_compressed(&mut buf)?;
+    Ok(buf)
+}

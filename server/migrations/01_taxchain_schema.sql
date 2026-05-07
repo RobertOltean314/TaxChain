@@ -4,31 +4,19 @@
 -- ============================================================================
 
 -- ENUMS
-CREATE TYPE sex AS ENUM ('M', 'F');
+DO $$ BEGIN CREATE TYPE sex AS ENUM ('M', 'F');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE stare_persoana_fizica AS ENUM (
-    'Activ',
-    'Inactiv',
-    'Suspendat'
-);
+DO $$ BEGIN CREATE TYPE stare_persoana_fizica AS ENUM ('Activ', 'Inactiv', 'Suspendat');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE stare_persoana_juridica AS ENUM (
-    'Activa',
-    'Radiata',
-    'Suspendata',
-    'In insolventa'
-);
+DO $$ BEGIN CREATE TYPE stare_persoana_juridica AS ENUM ('Activa', 'Radiata', 'Suspendata', 'In insolventa');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE functie_reprezentant AS ENUM (
-    'Administrator',
-    'Director General',
-    'Director Executiv',
-    'Presedinte',
-    'Vicepresedinte',
-    'Asociat',
-    'Actionar',
-    'Manager'
-);
+DO $$ BEGIN CREATE TYPE functie_reprezentant AS ENUM (
+    'Administrator', 'Director General', 'Director Executiv', 'Presedinte',
+    'Vicepresedinte', 'Asociat', 'Actionar', 'Manager'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- TABLES
 CREATE TABLE IF NOT EXISTS persoana_fizica (

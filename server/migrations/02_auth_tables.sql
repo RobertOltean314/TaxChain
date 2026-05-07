@@ -4,11 +4,8 @@
 -- ============================================================================
 
 -- ENUM
-CREATE TYPE user_role AS ENUM (
-    'Admin',
-    'Taxpayer',
-    'Auditor'
-);
+DO $$ BEGIN CREATE TYPE user_role AS ENUM ('Admin', 'Taxpayer', 'Auditor');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- USERS TABLE
 CREATE TABLE IF NOT EXISTS users (
@@ -60,35 +57,35 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 
 -- INDEXES
-CREATE INDEX idx_users_google_id
+CREATE INDEX IF NOT EXISTS idx_users_google_id
     ON users(google_id)
     WHERE google_id IS NOT NULL;
 
-CREATE INDEX idx_users_wallet_address
+CREATE INDEX IF NOT EXISTS idx_users_wallet_address
     ON users(wallet_address)
     WHERE wallet_address IS NOT NULL;
 
-CREATE INDEX idx_users_assigned_wallet_address
+CREATE INDEX IF NOT EXISTS idx_users_assigned_wallet_address
     ON users(assigned_wallet_address);
 
-CREATE INDEX idx_users_persoana_fizica_id
+CREATE INDEX IF NOT EXISTS idx_users_persoana_fizica_id
     ON users(persoana_fizica_id)
     WHERE persoana_fizica_id IS NOT NULL;
 
-CREATE INDEX idx_users_persoana_juridica_id
+CREATE INDEX IF NOT EXISTS idx_users_persoana_juridica_id
     ON users(persoana_juridica_id)
     WHERE persoana_juridica_id IS NOT NULL;
 
-CREATE INDEX idx_refresh_tokens_user_id
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id
     ON refresh_tokens(user_id);
 
-CREATE INDEX idx_persoana_fizica_wallet
+CREATE INDEX IF NOT EXISTS idx_persoana_fizica_wallet
     ON persoana_fizica(wallet)
     WHERE wallet IS NOT NULL;
 
-CREATE INDEX idx_persoana_juridica_wallet
+CREATE INDEX IF NOT EXISTS idx_persoana_juridica_wallet
     ON persoana_juridica(wallet)
     WHERE wallet IS NOT NULL;
 
-CREATE INDEX idx_reprezentanti_persoana_fizica
+CREATE INDEX IF NOT EXISTS idx_reprezentanti_persoana_fizica
     ON reprezentanti_persoana_juridica(persoana_fizica_id);

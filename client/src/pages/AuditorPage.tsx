@@ -53,7 +53,8 @@ export default function AuditorPage() {
   const [proofs, setProofs] = useState<FiscalProof[]>([]);
   const [loading, setLoading] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
-  const [verifyResults, setVerifyResults] = useState<Record<string, boolean>>({});
+  type VerifyResult = { valid: boolean; legacy?: boolean; circuit_version?: string };
+  const [verifyResults, setVerifyResults] = useState<Record<string, VerifyResult>>({});
 
   // Client-side instant search
   const [search, setSearch] = useState("");
@@ -87,8 +88,12 @@ export default function AuditorPage() {
     setVerifyingId(proofId);
     try {
       const result = await proofApi.verify(proofId);
-      setVerifyResults((prev) => ({ ...prev, [proofId]: result.valid }));
-      toast(result.valid ? "Dovadă ZK validă." : "Dovadă ZK invalidă!", result.valid ? undefined : "err");
+      setVerifyResults((prev) => ({ ...prev, [proofId]: result }));
+      if (result.legacy) {
+        toast("Dovadă generată cu un circuit anterior — nu poate fi re-verificată criptografic. Ancorarea blockchain rămâne validă.", "info", 8000);
+      } else {
+        toast(result.valid ? "Dovadă ZK validă." : "Dovadă ZK invalidă!", result.valid ? "ok" : "err");
+      }
     } catch {
       toast("Eroare la verificarea ZK.", "err");
     } finally {
@@ -96,8 +101,18 @@ export default function AuditorPage() {
     }
   };
 
+  // Show only ZK proofs that carry a full versioned fingerprint ("pf_v2_XXXXXXXX" / "pj_v2_XXXXXXXX").
+  // Proofs with NULL or the bare label ("pf_v2") were generated before key-fingerprinting was
+  // introduced and cannot be reliably verified — hide them. Non-ZK proofs are always shown.
+  const hasFingerprint = (cv: string | null | undefined) =>
+    cv != null && (cv.startsWith("pf_v2_") || cv.startsWith("pj_v2_"));
+  const currentProofs = proofs.filter(
+    (p) => !p.is_zk || hasFingerprint(p.circuit_version),
+  );
+  const legacyCount = proofs.length - currentProofs.length;
+
   const handleExportCsv = () => {
-    const csv = buildCsv(proofs);
+    const csv = buildCsv(currentProofs);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -109,16 +124,14 @@ export default function AuditorPage() {
 
   const q = search.trim().toLowerCase();
   const visibleProofs = q
-    ? proofs.filter(
+    ? currentProofs.filter(
         (p) =>
           p.entity_name?.toLowerCase().includes(q) ||
           p.entity_fiscal_code?.toLowerCase().includes(q) ||
           p.period_from?.includes(q) ||
           p.period_to?.includes(q),
       )
-    : proofs;
-
-  const compliantCount = proofs.length;
+    : currentProofs;
 
   return (
     <AppLayout>
@@ -138,9 +151,9 @@ export default function AuditorPage() {
         {/* ── Stats ──────────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 fade-up" style={{ animationDelay: "60ms" }}>
           {[
-            { label: "Total dovezi", value: proofs.length, color: "var(--text)" },
-            { label: "Entități conforme", value: compliantCount, color: "var(--green)" },
-            { label: "Dovezi ZK Groth16", value: proofs.length, color: "#6F00FF" },
+            { label: "Dovezi curente", value: currentProofs.length, color: "var(--text)" },
+            { label: "Entități conforme", value: currentProofs.length, color: "var(--green)" },
+            { label: "Dovezi ZK Groth16", value: currentProofs.filter((p) => p.is_zk).length, color: "#6F00FF" },
           ].map(({ label, value, color }) => (
             <div key={label} className="card p-4">
               <p className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color: "var(--text-dim)" }}>
@@ -152,6 +165,12 @@ export default function AuditorPage() {
             </div>
           ))}
         </div>
+        {legacyCount > 0 && (
+          <div className="mb-4 px-4 py-2.5 rounded-xl text-sm fade-up"
+            style={{ background: "color-mix(in srgb, var(--amber, #f59e0b) 10%, transparent)", color: "var(--amber, #f59e0b)", border: "1px solid color-mix(in srgb, var(--amber, #f59e0b) 25%, transparent)" }}>
+            ⚠ {legacyCount} {legacyCount > 1 ? "dovezi generate" : "dovadă generată"} cu un circuit anterior sau cu chei ZK diferite {legacyCount > 1 ? "sunt ascunse" : "este ascunsă"}. Regenerați dovezile pentru a le include în auditul curent.
+          </div>
+        )}
 
         {/* ── Filters ────────────────────────────────────────────────────────── */}
         <div className="card p-5 mb-6 fade-up" style={{ animationDelay: "120ms" }}>
@@ -316,12 +335,15 @@ export default function AuditorPage() {
                             {vr !== undefined ? (
                               <span
                                 className="text-xs px-2 py-1 rounded-lg font-semibold"
-                                style={vr
-                                  ? { background: "color-mix(in srgb, var(--green) 10%, transparent)", color: "var(--green)" }
-                                  : { background: "color-mix(in srgb, var(--red) 10%, transparent)", color: "var(--red)" }
+                                title={vr.legacy ? `Circuit anterior: ${vr.circuit_version ?? "legacy"}` : undefined}
+                                style={vr.legacy
+                                  ? { background: "color-mix(in srgb, var(--amber, #f59e0b) 12%, transparent)", color: "var(--amber, #f59e0b)" }
+                                  : vr.valid
+                                    ? { background: "color-mix(in srgb, var(--green) 10%, transparent)", color: "var(--green)" }
+                                    : { background: "color-mix(in srgb, var(--red) 10%, transparent)", color: "var(--red)" }
                                 }
                               >
-                                {vr ? "✓ Valid" : "✗ Invalid"}
+                                {vr.legacy ? "⚠ Circuit vechi" : vr.valid ? "✓ Valid" : "✗ Invalid"}
                               </span>
                             ) : (
                               <button
@@ -345,9 +367,9 @@ export default function AuditorPage() {
         </div>
 
         <p className="text-xs mt-4 text-center" style={{ color: "var(--text-dim)" }}>
-          {visibleProofs.length === proofs.length
-            ? `${proofs.length} dovezi afișate`
-            : `${visibleProofs.length} din ${proofs.length} dovezi`}
+          {visibleProofs.length === currentProofs.length
+            ? `${currentProofs.length} dovezi afișate`
+            : `${visibleProofs.length} din ${currentProofs.length} dovezi`}
           {" · "}Datele sunt preluate în timp real din sistem
         </p>
       </div>

@@ -4,7 +4,9 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::auth::middleware::require_role;
+use crate::models::audit_model::CreateAuditEntry;
 use crate::models::{PersoanaFizica, PersoanaFizicaRequest, UserRole};
+use crate::services::audit_service::DynAuditRepository;
 use crate::services::persoana_fizica_service::DynPersoanaFizicaRepository;
 
 /// GET /persoana-fizica — returns all records.
@@ -206,6 +208,55 @@ pub async fn update_persoana_fizica(
             eprintln!("update error: {e}");
             let error_body = json!({"error": format!("We failed to update the Persoana Fizica entity with id {}, please review the details for more information", id), "details": e.to_string()});
             HttpResponse::InternalServerError().json(error_body)
+        }
+    }
+}
+
+/// POST /persoana-fizica/{id}/stergere-date — GDPR right-to-erasure (Admin only).
+///
+/// Pseudonymises the CNP and nullifies contact + banking fields. The record is kept
+/// for fiscal integrity (invoices reference the entity) but identifying data is removed.
+#[post("/{id}/stergere-date")]
+pub async fn erase_persoana_fizica_date(
+    req: HttpRequest,
+    repo: web::Data<DynPersoanaFizicaRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
+    path: web::Path<Uuid>,
+) -> impl Responder {
+    let user = match require_role(&req, &[UserRole::Admin]) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
+    let id = path.into_inner();
+    let user_id = match user.claims().user_id() {
+        Ok(uid) => uid,
+        Err(_) => return HttpResponse::InternalServerError().json(json!({"error": "Invalid JWT"})),
+    };
+
+    match repo.erase_personal_data(id).await {
+        Ok(true) => {
+            let audit = audit_repo.clone();
+            actix_web::rt::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "pf.gdpr_erasure",
+                    actor_user_id: user_id,
+                    entity_type: Some("PF".into()),
+                    entity_id: Some(id),
+                    resource_type: "persoana_fizica",
+                    resource_id: Some(id),
+                    payload: json!({ "gdpr_article": "17", "fields_erased": ["cnp","adresa_domiciliu","cod_postal","iban","telefon","email"] }),
+                }).await;
+            });
+            HttpResponse::Ok().json(json!({
+                "success": true,
+                "message": "Datele personale au fost șterse conform GDPR art. 17 (dreptul la ștergere)."
+            }))
+        }
+        Ok(false) => HttpResponse::NotFound().json(json!({"error": format!("PersoanaFizica {} not found", id)})),
+        Err(e) => {
+            eprintln!("erase_persoana_fizica_date error: {e}");
+            HttpResponse::InternalServerError().json(json!({"error": "Eroare la ștergerea datelor personale", "details": e.to_string()}))
         }
     }
 }

@@ -9,10 +9,17 @@ import type { AuditLogEntry } from "../types";
 // ── Action color coding ───────────────────────────────────────────────────────
 
 const ACTION_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-  "invoice.created":       { label: "Factură Creată",         color: "var(--green)",  bg: "color-mix(in srgb, var(--green) 12%, transparent)" },
-  "invoice.status_changed":{ label: "Status Schimbat",        color: "var(--blue)",   bg: "color-mix(in srgb, var(--blue) 12%, transparent)" },
-  "invoice.deleted":       { label: "Factură Ștearsă",        color: "var(--red)",    bg: "color-mix(in srgb, var(--red) 12%, transparent)" },
-  "proof.generated":       { label: "Dovadă Generată",        color: "var(--violet)", bg: "color-mix(in srgb, var(--violet) 12%, transparent)" },
+  "invoice.created":       { label: "Factură Creată",     color: "var(--green)",  bg: "color-mix(in srgb, var(--green) 12%, transparent)" },
+  "invoice.status_changed":{ label: "Status Schimbat",    color: "var(--blue)",   bg: "color-mix(in srgb, var(--blue) 12%, transparent)" },
+  "invoice.deleted":       { label: "Factură Ștearsă",    color: "var(--red)",    bg: "color-mix(in srgb, var(--red) 12%, transparent)" },
+  "proof.generated":       { label: "Dovadă Generată",    color: "var(--violet)", bg: "color-mix(in srgb, var(--violet) 12%, transparent)" },
+  "partner.created":       { label: "Partener Adăugat",   color: "var(--green)",  bg: "color-mix(in srgb, var(--green) 12%, transparent)" },
+  "partner.updated":       { label: "Partener Modificat", color: "var(--blue)",   bg: "color-mix(in srgb, var(--blue) 12%, transparent)" },
+  "partner.deleted":       { label: "Partener Șters",     color: "var(--red)",    bg: "color-mix(in srgb, var(--red) 12%, transparent)" },
+  "entity.added":          { label: "Entitate Adăugată",  color: "var(--amber, #f59e0b)", bg: "color-mix(in srgb, var(--amber, #f59e0b) 12%, transparent)" },
+  "entity.removed":        { label: "Entitate Eliminată", color: "var(--red)",    bg: "color-mix(in srgb, var(--red) 12%, transparent)" },
+  "pf.gdpr_erasure":       { label: "Ștergere GDPR (PF)", color: "var(--red)",    bg: "color-mix(in srgb, var(--red) 12%, transparent)" },
+  "pj.gdpr_erasure":       { label: "Ștergere GDPR (PJ)", color: "var(--red)",    bg: "color-mix(in srgb, var(--red) 12%, transparent)" },
 };
 
 function actionStyle(action: string) {
@@ -68,11 +75,16 @@ function PayloadDetail({ payload }: { payload: Record<string, unknown> }) {
 
 const ACTION_FILTER_OPTIONS = [
   { value: "", label: "Toate acțiunile" },
-  { value: "invoice.", label: "Facturi" },
+  { value: "invoice.", label: "Facturi (toate)" },
   { value: "invoice.created", label: "Facturi create" },
-  { value: "invoice.status_changed", label: "Status schimbat" },
+  { value: "invoice.status_changed", label: "Status factură schimbat" },
   { value: "invoice.deleted", label: "Facturi șterse" },
   { value: "proof.", label: "Dovezi fiscale" },
+  { value: "partner.", label: "Parteneri (toate)" },
+  { value: "partner.created", label: "Parteneri adăugați" },
+  { value: "partner.updated", label: "Parteneri modificați" },
+  { value: "partner.deleted", label: "Parteneri șterși" },
+  { value: "entity.", label: "Entități gestionate" },
 ];
 
 const PAGE_SIZE = 50;
@@ -161,18 +173,18 @@ export default function AuditPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 fade-up" style={{ animationDelay: "60ms" }}>
           {(
             [
-              ["Facturi create",  "invoice.created",        "var(--green)"],
-              ["Status schimbat", "invoice.status_changed", "var(--blue)"],
-              ["Facturi șterse",  "invoice.deleted",        "var(--red)"],
-              ["Dovezi generate", "proof.generated",        "var(--violet)"],
-            ] as const
-          ).map(([label, key, color]) => (
-            <div key={key} className="card p-4 min-w-0 overflow-hidden">
+              ["Facturi",         "invoice.",        "var(--green)"],
+              ["Dovezi fiscale",  "proof.generated", "var(--violet)"],
+              ["Parteneri",       "partner.",        "var(--blue)"],
+              ["Entități",        "entity.",         "var(--amber, #f59e0b)"],
+            ] as [string, string, string][]
+          ).map(([label, prefix, color]) => (
+            <div key={prefix} className="card p-4 min-w-0 overflow-hidden">
               <p className="text-[10px] font-mono uppercase tracking-wider mb-1 truncate" style={{ color: "var(--text-dim)" }}>
                 {label}
               </p>
               <p className="text-xl font-bold font-display" style={{ color }}>
-                {entries.filter((e) => e.action === key).length}
+                {entries.filter((e) => e.action.startsWith(prefix)).length}
               </p>
             </div>
           ))}

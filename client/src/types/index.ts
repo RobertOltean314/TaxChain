@@ -254,6 +254,9 @@ export interface Invoice {
   created_by: string;
   created_at: string;
   updated_at: string;
+  sent_tx_hash: string | null;
+  sent_block_number: number | null;
+  sent_anchored_at: string | null;
   tx_hash: string | null;
   block_number: number | null;
   anchored_at: string | null;
@@ -300,5 +303,6 @@ export interface FiscalProof {
 
   // ZK flag
   is_zk: boolean;
+  circuit_version?: string | null;
 }
 

@@ -11,6 +11,7 @@ export const INVOICE_REGISTRY_ABI = [
     inputs: [
       { name: "proofHash", type: "bytes32" },
       { name: "periodHash", type: "bytes32" },
+      { name: "memo", type: "string" },
     ],
     outputs: [],
   },
@@ -18,7 +19,10 @@ export const INVOICE_REGISTRY_ABI = [
     name: "anchorInvoice",
     type: "function",
     stateMutability: "nonpayable",
-    inputs: [{ name: "invoiceHash", type: "bytes32" }],
+    inputs: [
+      { name: "invoiceHash", type: "bytes32" },
+      { name: "memo", type: "string" },
+    ],
     outputs: [],
   },
 ] as const;

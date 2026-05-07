@@ -1,7 +1,10 @@
 use crate::{
     auth::middleware::require_role,
-    models::{PersoanaJuridica, PersoanaJuridicaRequest, UserRole},
-    services::persoana_juridica_service::DynPersoanaJuridicaRepository,
+    models::{PersoanaJuridica, PersoanaJuridicaRequest, UserRole, audit_model::CreateAuditEntry},
+    services::{
+        audit_service::DynAuditRepository,
+        persoana_juridica_service::DynPersoanaJuridicaRepository,
+    },
 };
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
 use serde_json::json;
@@ -198,6 +201,55 @@ pub async fn update_persoana_juridica(
             eprintln!("update error: {e}");
             let error_body = json!({"error": format!("We failed to update the PersoanaJuridica entity with id {}, please review the details for more information", id), "details": e.to_string()});
             HttpResponse::InternalServerError().json(error_body)
+        }
+    }
+}
+
+/// POST /persoana-juridica/{id}/stergere-date — GDPR right-to-erasure (Admin only).
+///
+/// Nullifies IBAN, telefon and email for the legal entity. The record itself and the
+/// fiscal code are kept — invoices and audit entries reference the entity UUID.
+#[post("/{id}/stergere-date")]
+pub async fn erase_persoana_juridica_date(
+    req: HttpRequest,
+    repo: web::Data<DynPersoanaJuridicaRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
+    path: web::Path<Uuid>,
+) -> impl Responder {
+    let user = match require_role(&req, &[UserRole::Admin]) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
+    let id = path.into_inner();
+    let user_id = match user.claims().user_id() {
+        Ok(uid) => uid,
+        Err(_) => return HttpResponse::InternalServerError().json(json!({"error": "Invalid JWT"})),
+    };
+
+    match repo.erase_personal_data(id).await {
+        Ok(true) => {
+            let audit = audit_repo.clone();
+            actix_web::rt::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "pj.gdpr_erasure",
+                    actor_user_id: user_id,
+                    entity_type: Some("PJ".into()),
+                    entity_id: Some(id),
+                    resource_type: "persoana_juridica",
+                    resource_id: Some(id),
+                    payload: json!({ "gdpr_article": "17", "fields_erased": ["iban","telefon","email"] }),
+                }).await;
+            });
+            HttpResponse::Ok().json(json!({
+                "success": true,
+                "message": "Datele de contact și bancare au fost șterse conform GDPR art. 17 (dreptul la ștergere)."
+            }))
+        }
+        Ok(false) => HttpResponse::NotFound().json(json!({"error": format!("PersoanaJuridica {} not found", id)})),
+        Err(e) => {
+            eprintln!("erase_persoana_juridica_date error: {e}");
+            HttpResponse::InternalServerError().json(json!({"error": "Eroare la ștergerea datelor personale", "details": e.to_string()}))
         }
     }
 }

@@ -488,7 +488,7 @@ export function ReportsPage() {
   const [isGeneratingProof, setIsGeneratingProof] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
-  const [verifyResults, setVerifyResults] = useState<Record<string, { valid: boolean; verified_at: string }>>({});
+  const [verifyResults, setVerifyResults] = useState<Record<string, { valid: boolean; legacy?: boolean; verified_at?: string }>>({});
 
   const { data: walletBalance, isLoading: balanceLoading } = useBalance({
     address: user?.assigned_wallet_address as `0x${string}` | undefined,
@@ -571,8 +571,10 @@ export function ReportsPage() {
       const result = await proofApi.generateZk(from, to);
       setProofs((prev) => [result.proof, ...prev]);
       toast("Dovada ZK ancorată cu succes pe blockchain!");
-    } catch {
-      toast("Eroare la generarea dovezii ZK. (Generarea poate dura ~30s)", "err");
+    } catch (err: unknown) {
+      const serverMsg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast(serverMsg ?? "Eroare la generarea dovezii ZK. (Generarea poate dura ~30s)", "err", 10000);
     } finally {
       setIsGeneratingProof(false);
     }
@@ -1617,8 +1619,12 @@ export function ReportsPage() {
                             <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs mt-1" style={{ color: "var(--text-dim)" }}>
                               {p.entity_type === "PF" ? (
                                 <>
-                                  <span>CAS: <strong style={{ color: "var(--text)" }}>{formatRON(p.cas)}</strong></span>
-                                  <span>CASS: <strong style={{ color: "var(--text)" }}>{formatRON(p.cass)}</strong></span>
+                                  <span title="Rata statutară 25%, fără plafon — limitele legale (min) nu pot fi exprimate în circuitul ZK">
+                                    CAS <span style={{ color: "var(--amber, #f59e0b)", fontSize: "0.65rem" }}>*</span>: <strong style={{ color: "var(--text)" }}>{formatRON(p.cas)}</strong>
+                                  </span>
+                                  <span title="Rata statutară 10%, fără plafon — limitele legale (min) nu pot fi exprimate în circuitul ZK">
+                                    CASS <span style={{ color: "var(--amber, #f59e0b)", fontSize: "0.65rem" }}>*</span>: <strong style={{ color: "var(--text)" }}>{formatRON(p.cass)}</strong>
+                                  </span>
                                   <span>Impozit venit: <strong style={{ color: "var(--text)" }}>{formatRON(p.impozit_venit)}</strong></span>
                                 </>
                               ) : (
@@ -1628,6 +1634,11 @@ export function ReportsPage() {
                                 Total obligații: <strong>{formatRON(p.total_obligatii)}</strong>
                               </span>
                             </div>
+                            {p.entity_type === "PF" && (
+                              <p className="text-xs mt-1" style={{ color: "var(--text-dim)", opacity: 0.7 }}>
+                                <span style={{ color: "var(--amber, #f59e0b)" }}>*</span> CAS/CASS folosesc rate statutare necircumscrise (25%/10% din profitul net) — circuitul ZK nu poate exprima plafoanele legale (min). Estimarea fiscală din secțiunea de raport aplică plafoanele corecte.
+                              </p>
+                            )}
 
                             {/* ZK verify result */}
                             {vr && (
@@ -1642,7 +1653,7 @@ export function ReportsPage() {
                               >
                                 {vr.valid ? "✓ Dovadă ZK validă" : "✗ Dovadă ZK invalidă"}
                                 <span style={{ color: "var(--text-dim)" }}>
-                                  — verificat {new Date(vr.verified_at).toLocaleTimeString("ro-RO")}
+                                  — verificat {vr.verified_at ? new Date(vr.verified_at).toLocaleTimeString("ro-RO") : ""}
                                 </span>
                               </div>
                             )}

@@ -52,6 +52,9 @@ const SELECT_INVOICE: &str = "
         created_by,
         created_at,
         updated_at,
+        sent_tx_hash,
+        sent_block_number,
+        sent_anchored_at,
         tx_hash,
         block_number,
         anchored_at
@@ -118,6 +121,7 @@ const CREATE_INVOICE: &str = "
         observatii            AS notes,
         conditii_plata        AS payment_terms,
         created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
         tx_hash, block_number, anchored_at
 ";
 
@@ -179,6 +183,7 @@ const UPDATE_HEADER: &str = "
         observatii            AS notes,
         conditii_plata        AS payment_terms,
         created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
         tx_hash, block_number, anchored_at
 ";
 
@@ -209,6 +214,7 @@ const UPDATE_STATUS: &str = "
         observatii            AS notes,
         conditii_plata        AS payment_terms,
         created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
         tx_hash, block_number, anchored_at
 ";
 
@@ -243,6 +249,7 @@ const UPDATE_STATUS_TO_PAID: &str = "
         observatii            AS notes,
         conditii_plata        AS payment_terms,
         created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
         tx_hash, block_number, anchored_at
 ";
 
@@ -275,6 +282,7 @@ const UPDATE_PAYMENT: &str = "
         observatii            AS notes,
         conditii_plata        AS payment_terms,
         created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
         tx_hash, block_number, anchored_at
 ";
 
@@ -312,6 +320,9 @@ struct InvoiceRow {
     created_by: Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
+    sent_tx_hash: Option<String>,
+    sent_block_number: Option<i64>,
+    sent_anchored_at: Option<chrono::DateTime<chrono::Utc>>,
     tx_hash: Option<String>,
     block_number: Option<i64>,
     anchored_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -397,6 +408,9 @@ fn row_to_invoice(row: InvoiceRow) -> Result<Invoice, sqlx::Error> {
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: row.updated_at,
+        sent_tx_hash: row.sent_tx_hash,
+        sent_block_number: row.sent_block_number,
+        sent_anchored_at: row.sent_anchored_at,
         tx_hash: row.tx_hash,
         block_number: row.block_number,
         anchored_at: row.anchored_at,
@@ -518,13 +532,28 @@ pub trait InvoiceRepository: Send + Sync {
         series: &str,
     ) -> Result<String, sqlx::Error>;
 
-    /// Stores the blockchain anchoring result on an invoice.
+    /// Stores the Sent-transition blockchain anchor on an invoice.
+    async fn update_sent_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error>;
+
+    /// Stores the Paid-transition blockchain anchor on an invoice.
     async fn update_anchor_info(
         &self,
         id: Uuid,
         tx_hash: &str,
         block_number: i64,
     ) -> Result<Option<Invoice>, sqlx::Error>;
+
+    /// Returns `(issuer_display, partner_display)` for building a human-readable
+    /// blockchain memo. Issuer is "Prenume Nume" for PF or "Denumire" for PJ.
+    async fn get_anchor_parties(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<(String, String)>, sqlx::Error>;
 }
 
 pub type DynInvoiceRepository = Arc<dyn InvoiceRepository>;
@@ -855,6 +884,51 @@ impl InvoiceRepository for PgInvoiceRepository {
         Ok(result.rows_affected() > 0)
     }
 
+    async fn update_sent_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error> {
+        let row = sqlx::query_as::<_, InvoiceRow>(
+            "UPDATE factura
+             SET sent_tx_hash = $1, sent_block_number = $2, sent_anchored_at = NOW()
+             WHERE id = $3
+             RETURNING
+                 id,
+                 numar              AS number,
+                 serie              AS series,
+                 tip_document::text AS document_type,
+                 tip_tranzactie::text AS transaction_type,
+                 stare::text        AS status,
+                 data_emitere       AS issued_date,
+                 data_scadenta      AS due_date,
+                 data_livrare       AS delivery_date,
+                 emitent_pf_id      AS issuer_pf_id,
+                 emitent_pj_id      AS issuer_pj_id,
+                 partener_id        AS partner_id,
+                 moneda             AS currency,
+                 total_fara_tva::text  AS subtotal,
+                 total_tva::text       AS total_vat,
+                 total_cu_tva::text    AS total,
+                 suma_platita::text    AS amount_paid,
+                 rest_de_plata::text   AS amount_due,
+                 factura_referinta_id  AS reference_invoice_id,
+                 observatii            AS notes,
+                 conditii_plata        AS payment_terms,
+                 created_by, created_at, updated_at,
+                 sent_tx_hash, sent_block_number, sent_anchored_at,
+                 tx_hash, block_number, anchored_at",
+        )
+        .bind(tx_hash)
+        .bind(block_number)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(row_to_invoice).transpose()
+    }
+
     async fn update_anchor_info(
         &self,
         id: Uuid,
@@ -888,6 +962,7 @@ impl InvoiceRepository for PgInvoiceRepository {
                  observatii            AS notes,
                  conditii_plata        AS payment_terms,
                  created_by, created_at, updated_at,
+                 sent_tx_hash, sent_block_number, sent_anchored_at,
                  tx_hash, block_number, anchored_at",
         )
         .bind(tx_hash)
@@ -897,5 +972,36 @@ impl InvoiceRepository for PgInvoiceRepository {
         .await?;
 
         row.map(row_to_invoice).transpose()
+    }
+
+    async fn get_anchor_parties(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<(String, String)>, sqlx::Error> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            issuer: String,
+            partner: String,
+        }
+
+        let row = sqlx::query_as::<_, Row>(
+            "SELECT
+                COALESCE(
+                    pf.prenume || ' ' || pf.nume,
+                    pj.denumire,
+                    'Necunoscut'
+                ) AS issuer,
+                COALESCE(p.denumire, 'Necunoscut') AS partner
+             FROM factura f
+             LEFT JOIN persoana_fizica   pf ON f.emitent_pf_id = pf.id
+             LEFT JOIN persoana_juridica pj ON f.emitent_pj_id = pj.id
+             LEFT JOIN partener          p  ON f.partener_id   = p.id
+             WHERE f.id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| (r.issuer, r.partner)))
     }
 }

@@ -4,8 +4,13 @@ import type { FiscalProof } from "../types";
 export interface VerifyResult {
   proof_id: string;
   valid: boolean;
-  verified_at: string;
-  public_inputs: {
+  verified_at?: string;
+  /** true when the proof was generated with an older circuit — cannot be re-verified cryptographically */
+  legacy?: boolean;
+  circuit_version?: string;
+  current_version?: string;
+  message?: string;
+  public_inputs?: {
     venituri_brute: string;
     cheltuieli_brute: string;
     vat_colectat: string;

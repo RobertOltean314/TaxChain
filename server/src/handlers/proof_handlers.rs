@@ -9,8 +9,9 @@ use uuid::Uuid;
 use crate::{
     auth::middleware::require_role,
     blockchain::anchor::DynAnchorService,
-    models::{UserRole, entity_model::EntityContext},
+    models::{UserRole, audit_model::CreateAuditEntry, entity_model::EntityContext},
     services::{
+        audit_service::DynAuditRepository,
         bnr_service::DynBnrService,
         persoana_fizica_service::DynPersoanaFizicaRepository,
         persoana_juridica_service::DynPersoanaJuridicaRepository,
@@ -129,6 +130,23 @@ fn compute_pf_taxes(
     (cas, cass, impozit_venit, total_obligatii)
 }
 
+/// Uncapped PF tax computation for ZK circuit inputs.
+/// The CAS/CASS income ceilings (97 200 / 243 000 RON) are non-linear (min)
+/// and cannot be expressed as R1CS constraints, so the circuit uses the flat
+/// statutory rates. Applicable for income below the ceiling thresholds.
+fn compute_pf_taxes_zk(
+    profit_net: Decimal,
+    vat_net: Decimal,
+) -> (Decimal, Decimal, Decimal, Decimal) {
+    let rate25 = Decimal::new(25, 2);
+    let rate10 = Decimal::new(10, 2);
+    let cas = profit_net * rate25;
+    let cass = profit_net * rate10;
+    let impozit_venit = (profit_net - cas - cass).max(Decimal::ZERO) * rate10;
+    let total_obligatii = cas + cass + impozit_venit + vat_net.max(Decimal::ZERO);
+    (cas, cass, impozit_venit, total_obligatii)
+}
+
 /// Tax computation for SRL (Societate cu Raspundere Limitata).
 /// Returns (impozit_profit, total_obligatii).
 fn compute_pj_taxes(
@@ -219,8 +237,14 @@ async fn run_plain_proof(
     let proof_hash_hex = hex(proof_bytes);
     let period_hash_hex = hex(period_bytes);
 
+    let memo = format!(
+        "TaxChain | Proof | {} | {} – {}",
+        entity_fiscal_code,
+        from.format("%Y-%m-%d"),
+        to.format("%Y-%m-%d")
+    );
     let (tx_hash, block_number) =
-        match anchor_service.anchor_proof(proof_bytes, period_bytes, private_key).await {
+        match anchor_service.anchor_proof(proof_bytes, period_bytes, private_key, memo).await {
             Ok(pair) => pair,
             Err(e) => {
                 eprintln!("proof: Sepolia call failed: {e}");
@@ -254,6 +278,7 @@ async fn run_plain_proof(
             block_number,
             false,
             None,
+            None, // plain SHA-256 proof — no ZK circuit
         )
         .await
     {
@@ -287,6 +312,7 @@ pub async fn generate_proof(
     bnr_svc: web::Data<DynBnrService>,
     anchor_service: web::Data<DynAnchorService>,
     proof_repo: web::Data<DynProofRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
     pf_repo: web::Data<DynPersoanaFizicaRepository>,
     pj_repo: web::Data<DynPersoanaJuridicaRepository>,
 ) -> impl Responder {
@@ -342,10 +368,37 @@ pub async fn generate_proof(
     )
     .await
     {
-        Ok((proof, etherscan_url)) => HttpResponse::Ok().json(json!({
-            "proof": proof,
-            "etherscan_url": etherscan_url
-        })),
+        Ok((proof, etherscan_url)) => {
+            let audit = audit_repo.clone();
+            let proof_id = proof.id;
+            let entity_type = ctx.entity_type.clone();
+            let entity_id = ctx.entity_id;
+            let name = entity_name.clone();
+            let fiscal = entity_fiscal_code.clone();
+            let period_from = body.from.clone();
+            let period_to = body.to.clone();
+            actix_web::rt::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "proof.generated",
+                    actor_user_id: user_id,
+                    entity_type: Some(entity_type),
+                    entity_id: Some(entity_id),
+                    resource_type: "proof",
+                    resource_id: Some(proof_id),
+                    payload: json!({
+                        "kind": "sha256",
+                        "entity_name": name,
+                        "fiscal_code": fiscal,
+                        "period_from": period_from,
+                        "period_to": period_to,
+                    }),
+                }).await;
+            });
+            HttpResponse::Ok().json(json!({
+                "proof": proof,
+                "etherscan_url": etherscan_url
+            }))
+        }
         Err(r) => r,
     }
 }
@@ -362,6 +415,7 @@ pub async fn generate_zk_proof(
     bnr_svc: web::Data<DynBnrService>,
     anchor_service: web::Data<DynAnchorService>,
     proof_repo: web::Data<DynProofRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
     pf_repo: web::Data<DynPersoanaFizicaRepository>,
     pj_repo: web::Data<DynPersoanaJuridicaRepository>,
     zk_svc: web::Data<DynZkService>,
@@ -386,13 +440,13 @@ pub async fn generate_zk_proof(
     };
 
     let today = Utc::now().date_naive();
-    let (vat_colectat, vat_deductibil, venituri_brute, cheltuieli_brute, eur_rate) =
+    let (vat_colectat, vat_deductibil, venituri_brute, cheltuieli_brute, _eur_rate) =
         match aggregate_vat(&report_svc, &bnr_svc, &ctx, from, to, today).await {
             Ok(v) => v,
             Err(r) => return r,
         };
 
-    // ── Build per-invoice arrays for ZK circuit ───────────────────────────────
+    // ── Build per-invoice arrays for ZK circuit ──────────────────────────────
     let invoice_rows = match report_svc
         .invoice_amounts_for_zk(&ctx.entity_type, ctx.entity_id, from, to)
         .await
@@ -439,22 +493,74 @@ pub async fn generate_zk_proof(
         }
     }
 
+    let vat_net = vat_colectat - vat_deductibil;
+    // Exclude pass-through VAT from the income/expense base for tax computation
+    let venituri_nete = venituri_brute - vat_colectat;
+    let cheltuieli_nete = cheltuieli_brute - vat_deductibil;
+    let profit_net = venituri_nete - cheltuieli_nete;
+
+    // The ZK circuit works over a prime field — there are no negative numbers.
+    // A loss (expenses > income) would make `income_base_sum - expense_base_sum`
+    // wrap to a huge field element, causing constraint 5 to fail and producing an
+    // invalid proof. Reject early: for loss periods use a plain SHA-256 proof instead.
+    if profit_net < Decimal::ZERO {
+        return HttpResponse::BadRequest().json(json!({
+            "error": "Dovada ZK nu poate fi generată pentru perioade cu pierdere netă (cheltuieli > venituri). \
+                      Folosiți dovada simplă (SHA-256) în schimb — pentru o perioadă cu pierdere, \
+                      obligațiile fiscale pe venit sunt zero și doar TVA trebuie dovedită."
+        }));
+    }
+
+    // Use uncapped statutory rates for ZK circuit inputs — the CAS/CASS income
+    // ceilings are non-linear (min) and cannot be expressed as R1CS constraints.
+    let (cas, cass, impozit_venit, impozit_profit, total_obligatii) = if ctx.entity_type == "PF" {
+        let (c, cs, iv, total) = compute_pf_taxes_zk(profit_net, vat_net);
+        (c, cs, iv, Decimal::ZERO, total)
+    } else {
+        // SRL: 16% flat profit tax (standard rate; micro-enterprise rate excluded
+        // because it uses revenue as base — non-linear for the circuit)
+        let ip = profit_net * Decimal::new(16, 2);
+        let total = ip + vat_net.max(Decimal::ZERO);
+        (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO, ip, total)
+    };
+
     let venituri_scaled = to_scaled_u64(venituri_brute);
     let cheltuieli_scaled = to_scaled_u64(cheltuieli_brute);
     let vat_col_scaled = to_scaled_u64(vat_colectat);
     let vat_ded_scaled = to_scaled_u64(vat_deductibil);
+    let profit_scaled = to_scaled_u64(profit_net);
 
-    // ── Generate Groth16 proof ────────────────────────────────────────────────
-    let zk_bytes = match zk_svc.generate_proof(
-        income_bases,
-        income_vats,
-        expense_bases,
-        expense_vats,
-        venituri_scaled,
-        cheltuieli_scaled,
-        vat_col_scaled,
-        vat_ded_scaled,
-    ) {
+    // ── Generate Groth16 proof (circuit chosen by entity type) ───────────────
+    let zk_bytes = if ctx.entity_type == "PF" {
+        zk_svc.generate_pf_proof(
+            income_bases,
+            income_vats,
+            expense_bases,
+            expense_vats,
+            venituri_scaled,
+            cheltuieli_scaled,
+            vat_col_scaled,
+            vat_ded_scaled,
+            profit_scaled,
+            to_scaled_u64(cas),
+            to_scaled_u64(cass),
+            to_scaled_u64(impozit_venit),
+        )
+    } else {
+        zk_svc.generate_pj_proof(
+            income_bases,
+            income_vats,
+            expense_bases,
+            expense_vats,
+            venituri_scaled,
+            cheltuieli_scaled,
+            vat_col_scaled,
+            vat_ded_scaled,
+            profit_scaled,
+            to_scaled_u64(impozit_profit),
+        )
+    };
+    let zk_bytes = match zk_bytes {
         Ok(b) => b,
         Err(e) => {
             eprintln!("zk proof: Groth16 generation failed: {e}");
@@ -500,8 +606,14 @@ pub async fn generate_zk_proof(
         },
     };
 
+    let memo = format!(
+        "TaxChain | ZK Proof | {} | {} – {}",
+        ctx.entity_id,
+        from.format("%Y-%m-%d"),
+        to.format("%Y-%m-%d")
+    );
     let (tx_hash, block_number) =
-        match anchor_service.anchor_proof(proof_hash_bytes, period_bytes, &private_key).await {
+        match anchor_service.anchor_proof(proof_hash_bytes, period_bytes, &private_key, memo).await {
             Ok(pair) => pair,
             Err(e) => {
                 eprintln!("zk proof: Sepolia call failed: {e}");
@@ -510,19 +622,13 @@ pub async fn generate_zk_proof(
             }
         };
 
-    let vat_net = vat_colectat - vat_deductibil;
-    // Tax base must exclude VAT — VAT is a pass-through, not income
-    let venituri_nete = venituri_brute - vat_colectat;
-    let cheltuieli_nete = cheltuieli_brute - vat_deductibil;
     let (entity_name, entity_fiscal_code) =
         resolve_entity_info(&ctx.entity_type, ctx.entity_id, &pf_repo, &pj_repo).await;
 
-    let (cas, cass, impozit_venit, impozit_profit, total_obligatii) = if ctx.entity_type == "PF" {
-        let (cas, cass, iv, total) = compute_pf_taxes(venituri_nete, cheltuieli_nete, vat_net);
-        (cas, cass, iv, Decimal::ZERO, total)
+    let cv = if ctx.entity_type == "PF" {
+        zk_svc.pf_circuit_version()
     } else {
-        let (ip, total) = compute_pj_taxes(venituri_nete, cheltuieli_nete, vat_net, eur_rate);
-        (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO, ip, total)
+        zk_svc.pj_circuit_version()
     };
 
     let proof = match proof_repo
@@ -550,6 +656,7 @@ pub async fn generate_zk_proof(
             block_number,
             true,
             Some(zk_bytes),
+            Some(cv.as_str()),
         )
         .await
     {
@@ -564,6 +671,32 @@ pub async fn generate_zk_proof(
             }));
         }
     };
+
+    let audit = audit_repo.clone();
+    let proof_id = proof.id;
+    let audit_entity_type = ctx.entity_type.clone();
+    let audit_entity_id = ctx.entity_id;
+    let audit_name = entity_name.clone();
+    let audit_fiscal = entity_fiscal_code.clone();
+    let audit_from = body.from.clone();
+    let audit_to = body.to.clone();
+    actix_web::rt::spawn(async move {
+        let _ = audit.log(CreateAuditEntry {
+            action: "proof.generated",
+            actor_user_id: user_id,
+            entity_type: Some(audit_entity_type),
+            entity_id: Some(audit_entity_id),
+            resource_type: "proof",
+            resource_id: Some(proof_id),
+            payload: json!({
+                "kind": "zk_groth16",
+                "entity_name": audit_name,
+                "fiscal_code": audit_fiscal,
+                "period_from": audit_from,
+                "period_to": audit_to,
+            }),
+        }).await;
+    });
 
     HttpResponse::Ok().json(json!({
         "proof": proof,
@@ -603,6 +736,31 @@ pub async fn verify_proof(
             .json(json!({"error": "This proof is not a ZK proof — use on-chain hash verification instead"}));
     }
 
+    // Check circuit version compatibility before attempting cryptographic verification.
+    // Proofs generated with an older circuit cannot be verified against the current keys —
+    // the R1CS structure changed, so the verifying key is different.
+    let expected_version = if proof.entity_type == "PF" {
+        zk_svc.pf_circuit_version()
+    } else {
+        zk_svc.pj_circuit_version()
+    };
+    let stored_version = proof.circuit_version.as_deref().unwrap_or("legacy");
+    if stored_version != expected_version {
+        return HttpResponse::Ok().json(json!({
+            "proof_id": proof_id,
+            "entity_type": proof.entity_type,
+            "valid": false,
+            "legacy": true,
+            "circuit_version": stored_version,
+            "current_version": expected_version,
+            "message": format!(
+                "Această dovadă a fost generată cu o versiune anterioară a circuitului ZK sau cu chei diferite ({stored_version}). \
+                 Cheia de verificare curentă ({expected_version}) nu este compatibilă. \
+                 Autenticitatea poate fi verificată independent prin hash-ul SHA-256 ancorat pe blockchain."
+            ),
+        }));
+    }
+
     let Some(bytes) = zk_bytes else {
         return HttpResponse::InternalServerError()
             .json(json!({"error": "ZK proof bytes not stored"}));
@@ -612,10 +770,38 @@ pub async fn verify_proof(
     let cheltuieli_scaled = to_scaled_u64(proof.cheltuieli_brute);
     let vat_col_scaled = to_scaled_u64(proof.vat_colectat);
     let vat_ded_scaled = to_scaled_u64(proof.vat_deductibil);
+    let profit_net = proof.venituri_brute - proof.vat_colectat
+        - (proof.cheltuieli_brute - proof.vat_deductibil);
+    let profit_scaled = to_scaled_u64(profit_net);
 
-    match zk_svc.verify_proof(&bytes, venituri_scaled, cheltuieli_scaled, vat_col_scaled, vat_ded_scaled) {
+    let result = if proof.entity_type == "PF" {
+        zk_svc.verify_pf_proof(
+            &bytes,
+            venituri_scaled,
+            cheltuieli_scaled,
+            vat_col_scaled,
+            vat_ded_scaled,
+            profit_scaled,
+            to_scaled_u64(proof.cas),
+            to_scaled_u64(proof.cass),
+            to_scaled_u64(proof.impozit_venit),
+        )
+    } else {
+        zk_svc.verify_pj_proof(
+            &bytes,
+            venituri_scaled,
+            cheltuieli_scaled,
+            vat_col_scaled,
+            vat_ded_scaled,
+            profit_scaled,
+            to_scaled_u64(proof.impozit_profit),
+        )
+    };
+
+    match result {
         Ok(valid) => HttpResponse::Ok().json(json!({
             "proof_id": proof_id,
+            "entity_type": proof.entity_type,
             "valid": valid,
             "verified_at": Utc::now().to_rfc3339(),
             "public_inputs": {
@@ -623,6 +809,11 @@ pub async fn verify_proof(
                 "cheltuieli_brute":  proof.cheltuieli_brute,
                 "vat_colectat":      proof.vat_colectat,
                 "vat_deductibil":    proof.vat_deductibil,
+                "profit_net":        profit_net,
+                "cas":               proof.cas,
+                "cass":              proof.cass,
+                "impozit_venit":     proof.impozit_venit,
+                "impozit_profit":    proof.impozit_profit,
             }
         })),
         Err(e) => HttpResponse::InternalServerError()

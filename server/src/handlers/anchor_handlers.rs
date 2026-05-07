@@ -71,10 +71,18 @@ pub async fn anchor_invoice_handler(
         }));
     }
 
-    // Already anchored — return existing data
-    if invoice.tx_hash.is_some() {
-        let tx = invoice.tx_hash.as_deref().unwrap_or("");
-        let block = invoice.block_number.unwrap_or(0);
+    // Already anchored — return existing data for the relevant transition
+    let existing_tx = if invoice.status == crate::models::InvoiceStatus::Sent {
+        invoice.sent_tx_hash.as_deref()
+    } else {
+        invoice.tx_hash.as_deref()
+    };
+    if let Some(tx) = existing_tx {
+        let block = if invoice.status == crate::models::InvoiceStatus::Sent {
+            invoice.sent_block_number.unwrap_or(0)
+        } else {
+            invoice.block_number.unwrap_or(0)
+        };
         return HttpResponse::Ok().json(AnchorResponse {
             etherscan_url: etherscan_url(tx),
             tx_hash: tx.to_string(),
@@ -121,11 +129,24 @@ pub async fn anchor_invoice_handler(
         }
     };
 
-    // ── Compute hash ──────────────────────────────────────────────────────────
-    let hash = AnchorService::compute_invoice_hash(&invoice, &lines);
+    // ── Compute hash (transition label must match the automatic anchoring) ─────
+    let transition = if invoice.status == crate::models::InvoiceStatus::Sent { "sent" } else { "paid" };
+    let hash = AnchorService::compute_invoice_hash(&invoice, &lines, transition);
+    let (issuer, partner) = invoice_repo
+        .get_anchor_parties(invoice_id).await
+        .unwrap_or(None)
+        .unwrap_or_else(|| ("Necunoscut".into(), "Necunoscut".into()));
+    let memo = format!(
+        "TaxChain | {} | {} | {} → {} | {}",
+        invoice.number,
+        if invoice.status == crate::models::InvoiceStatus::Sent { "Trimisa" } else { "Platita" },
+        issuer,
+        partner,
+        chrono::Utc::now().format("%Y-%m-%d")
+    );
 
     // ── Submit to Sepolia (blocks ~12–15s for one confirmation) ──────────────
-    let (tx_hash, block_number) = match anchor_service.anchor_invoice(hash, &private_key).await {
+    let (tx_hash, block_number) = match anchor_service.anchor_invoice(hash, &private_key, memo).await {
         Ok(pair) => pair,
         Err(AnchorError::Contract(msg)) if msg.contains("already anchored") => {
             return HttpResponse::Conflict().json(json!({
@@ -139,11 +160,13 @@ pub async fn anchor_invoice_handler(
         }
     };
 
-    // ── Persist ───────────────────────────────────────────────────────────────
-    match invoice_repo
-        .update_anchor_info(invoice_id, &tx_hash, block_number)
-        .await
-    {
+    // ── Persist to the right column ───────────────────────────────────────────
+    let persist_result = if invoice.status == crate::models::InvoiceStatus::Sent {
+        invoice_repo.update_sent_anchor_info(invoice_id, &tx_hash, block_number).await
+    } else {
+        invoice_repo.update_anchor_info(invoice_id, &tx_hash, block_number).await
+    };
+    match persist_result {
         Ok(_) => {}
         Err(e) => {
             eprintln!("anchor: DB update failed after successful anchor — tx_hash={tx_hash}: {e}");

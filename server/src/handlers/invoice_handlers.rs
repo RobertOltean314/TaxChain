@@ -419,6 +419,54 @@ pub async fn update_invoice_status(
         }));
     }
 
+    // ── On-chain anchoring for Sent / Paid: attempt BEFORE committing status ──
+    // If we have a signing key and the chain call fails, we return an error and
+    // leave the invoice in its current status so the user can retry.
+    let anchor_ok: Option<(String, i64)> =
+        if body.status == InvoiceStatus::Sent || body.status == InvoiceStatus::Paid {
+            let private_key = match user_repo.find_by_id(user_id).await {
+                Ok(Some(u)) => match u.assigned_wallet_key_enc.as_deref() {
+                    Some(enc) => crate::wallet::encryption::decrypt_private_key(enc, None).ok(),
+                    None => std::env::var("PLATFORM_SIGNER_KEY").ok().filter(|k| !k.is_empty()),
+                },
+                _ => None,
+            };
+
+            if let Some(key) = private_key {
+                let lines = repo.find_lines(id).await.unwrap_or_default();
+                let transition = if body.status == InvoiceStatus::Sent { "sent" } else { "paid" };
+                let hash = crate::blockchain::anchor::AnchorService::compute_invoice_hash(&existing, &lines, transition);
+                let (issuer, partner) = repo
+                    .get_anchor_parties(id).await
+                    .unwrap_or(None)
+                    .unwrap_or_else(|| ("Necunoscut".into(), "Necunoscut".into()));
+                let memo = format!(
+                    "TaxChain | {} | {} | {} → {} | {}",
+                    existing.number,
+                    if body.status == InvoiceStatus::Sent { "Trimisa" } else { "Platita" },
+                    issuer,
+                    partner,
+                    chrono::Utc::now().format("%Y-%m-%d")
+                );
+
+                match anchor_service.anchor_invoice(hash, &key, memo).await {
+                    Ok(result) => Some(result),
+                    Err(e) => {
+                        return HttpResponse::BadGateway().json(json!({
+                            "error": "Blockchain anchor failed — invoice status not changed. Check your wallet balance and retry.",
+                            "details": e.to_string()
+                        }));
+                    }
+                }
+            } else {
+                eprintln!("anchor invoice: no private key for user {user_id}, proceeding without anchor");
+                None
+            }
+        } else {
+            None
+        };
+
+    // ── Commit status to DB ──────────────────────────────────────────────────
     let invoice = match repo.update_status(id, body.status, user_id).await {
         Ok(Some(inv)) => inv,
         Ok(None) => {
@@ -434,62 +482,59 @@ pub async fn update_invoice_status(
         }
     };
 
-    // ── On-chain anchoring when invoice transitions to Paid ───────────────────
-    if body.status == InvoiceStatus::Paid {
-        let private_key = match user_repo.find_by_id(user_id).await {
-            Ok(Some(u)) => match u.assigned_wallet_key_enc.as_deref() {
-                Some(enc) => crate::wallet::encryption::decrypt_private_key(enc, None).ok(),
-                None => std::env::var("PLATFORM_SIGNER_KEY").ok().filter(|k| !k.is_empty()),
-            },
-            _ => None,
-        };
-
-        if let Some(key) = private_key {
-            let lines = repo.find_lines(id).await.unwrap_or_default();
-            let hash = crate::blockchain::anchor::AnchorService::compute_invoice_hash(&invoice, &lines);
-
-            match anchor_service.anchor_invoice(hash, &key).await {
-                Ok((tx_hash, block_number)) => {
-                    match repo.update_anchor_info(id, &tx_hash, block_number).await {
-                        Ok(Some(anchored)) => return HttpResponse::Ok().json(anchored),
-                        Ok(None) => eprintln!("anchor invoice: update_anchor_info returned None"),
-                        Err(e) => eprintln!("anchor invoice: DB write failed after tx={tx_hash}: {e}"),
-                    }
-                }
-                Err(e) => eprintln!("anchor invoice: Sepolia call failed: {e}"),
-            }
+    // ── Store anchor result (chain call already succeeded above) ─────────────
+    if let Some((tx_hash, block_number)) = anchor_ok {
+        let db_result = if body.status == InvoiceStatus::Sent {
+            repo.update_sent_anchor_info(id, &tx_hash, block_number).await
         } else {
-            eprintln!("anchor invoice: no private key available for user {user_id}");
+            repo.update_anchor_info(id, &tx_hash, block_number).await
+        };
+        match db_result {
+            Ok(Some(anchored)) => {
+                fire_status_audit(&audit_repo, user_id, &existing, body.status, id, &anchored);
+                return HttpResponse::Ok().json(anchored);
+            }
+            Ok(None) => eprintln!("anchor invoice: update_anchor_info returned None"),
+            Err(e) => eprintln!("anchor invoice: DB write failed after tx={tx_hash}: {e}"),
         }
     }
 
-    // Audit: fire-and-forget after status update succeeds
-    {
-        let audit = audit_repo.clone();
-        let from_status = format!("{:?}", existing.status);
-        let to_status = format!("{:?}", body.status);
-        let number = invoice.number.clone();
-        let entity_type = invoice.issuer_pf_id.map(|_| "PF".to_string())
-            .or_else(|| invoice.issuer_pj_id.map(|_| "PJ".to_string()));
-        let entity_id = invoice.issuer_pf_id.or(invoice.issuer_pj_id);
-        tokio::spawn(async move {
-            let _ = audit.log(CreateAuditEntry {
-                action: "invoice.status_changed",
-                actor_user_id: user_id,
-                entity_type,
-                entity_id,
-                resource_type: "invoice",
-                resource_id: Some(id),
-                payload: serde_json::json!({
-                    "from": from_status,
-                    "to": to_status,
-                    "number": number,
-                }),
-            }).await;
-        });
-    }
+    // Audit: fire-and-forget
+    fire_status_audit(&audit_repo, user_id, &existing, body.status, id, &invoice);
 
     HttpResponse::Ok().json(invoice)
+}
+
+fn fire_status_audit(
+    audit_repo: &crate::services::audit_service::DynAuditRepository,
+    user_id: Uuid,
+    existing: &Invoice,
+    next_status: InvoiceStatus,
+    invoice_id: Uuid,
+    invoice: &Invoice,
+) {
+    let audit = audit_repo.clone();
+    let from_status = format!("{:?}", existing.status);
+    let to_status = format!("{:?}", next_status);
+    let number = invoice.number.clone();
+    let entity_type = invoice.issuer_pf_id.map(|_| "PF".to_string())
+        .or_else(|| invoice.issuer_pj_id.map(|_| "PJ".to_string()));
+    let entity_id = invoice.issuer_pf_id.or(invoice.issuer_pj_id);
+    tokio::spawn(async move {
+        let _ = audit.log(CreateAuditEntry {
+            action: "invoice.status_changed",
+            actor_user_id: user_id,
+            entity_type,
+            entity_id,
+            resource_type: "invoice",
+            resource_id: Some(invoice_id),
+            payload: serde_json::json!({
+                "from": from_status,
+                "to": to_status,
+                "number": number,
+            }),
+        }).await;
+    });
 }
 
 /// `PATCH /factura/:id/payment` — record a cumulative payment amount.

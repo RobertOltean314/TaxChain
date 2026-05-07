@@ -17,8 +17,8 @@ use crate::models::{Invoice, InvoiceLine};
 abigen!(
     InvoiceRegistry,
     r#"[
-        function anchorInvoice(bytes32 invoiceHash) external
-        function anchorProof(bytes32 proofHash, bytes32 periodHash) external
+        function anchorInvoice(bytes32 invoiceHash, string memo) external
+        function anchorProof(bytes32 proofHash, bytes32 periodHash, string memo) external
         function isInvoiceAnchored(address issuer, bytes32 invoiceHash) external view returns (bool anchored, uint256 timestamp)
     ]"#
 );
@@ -45,10 +45,12 @@ impl AnchorService {
 
     /// Hash an invoice + its lines into a deterministic bytes32.
     ///
-    /// Canonical format: SHA-256 of the UTF-8 JSON produced by serde_json.
-    /// Field order follows struct definition — deterministic in Rust.
-    pub fn compute_invoice_hash(invoice: &Invoice, lines: &[InvoiceLine]) -> [u8; 32] {
+    /// `transition` must be a unique label per anchoring event (e.g. "sent",
+    /// "paid") so that two anchors for the same invoice produce distinct
+    /// hashes and don't collide inside the contract's duplicate-anchor guard.
+    pub fn compute_invoice_hash(invoice: &Invoice, lines: &[InvoiceLine], transition: &str) -> [u8; 32] {
         let canonical = serde_json::json!({
+            "transition":   transition,
             "id":           invoice.id,
             "number":       invoice.number,
             "series":       invoice.series,
@@ -80,11 +82,12 @@ impl AnchorService {
         &self,
         invoice_hash: [u8; 32],
         private_key_hex: &str,
+        memo: String,
     ) -> Result<(String, i64), AnchorError> {
         let (client, _wallet_addr) = self.build_client(private_key_hex)?;
         let contract = InvoiceRegistry::new(self.contract_address, client.clone());
 
-        let call = contract.anchor_invoice(invoice_hash);
+        let call = contract.anchor_invoice(invoice_hash, memo).gas(200_000u64);
         let pending = call
             .send()
             .await
@@ -101,17 +104,18 @@ impl AnchorService {
         Ok((tx_hash, block_number))
     }
 
-    /// Anchor a ZK proof hash on Sepolia (Phase 9 integration).
+    /// Anchor a ZK proof hash on Sepolia
     pub async fn anchor_proof(
         &self,
         proof_hash: [u8; 32],
         period_hash: [u8; 32],
         private_key_hex: &str,
+        memo: String,
     ) -> Result<(String, i64), AnchorError> {
         let (client, _) = self.build_client(private_key_hex)?;
         let contract = InvoiceRegistry::new(self.contract_address, client);
 
-        let call = contract.anchor_proof(proof_hash, period_hash);
+        let call = contract.anchor_proof(proof_hash, period_hash, memo).gas(200_000u64);
         let pending = call
             .send()
             .await

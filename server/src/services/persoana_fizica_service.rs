@@ -68,6 +68,8 @@ pub trait PersoanaFizicaRepository: Send + Sync {
         persoana: PersoanaFizica,
     ) -> Result<Option<PersoanaFizica>, sqlx::Error>;
     async fn delete(&self, id: Uuid) -> Result<bool, sqlx::Error>;
+    /// GDPR right-to-erasure: pseudonymise CNP and nullify contact + banking fields.
+    async fn erase_personal_data(&self, id: Uuid) -> Result<bool, sqlx::Error>;
 }
 
 /// Type alias for a heap-allocated, dynamically dispatched repository.
@@ -236,6 +238,28 @@ impl PersoanaFizicaRepository for PgPersoanaFizicaRepository {
             .bind(id)
             .execute(&self.pool)
             .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    async fn erase_personal_data(&self, id: Uuid) -> Result<bool, sqlx::Error> {
+        // CNP is NOT NULL UNIQUE — pseudonymize to satisfy the constraint while removing real value.
+        // "STERS" + first 8 hex chars of UUID = exactly 13 chars (VARCHAR(13) limit).
+        let pseudo_cnp = format!("STERS{}", &id.to_string()[..8]);
+        let result = sqlx::query(
+            r#"UPDATE persoana_fizica
+               SET cnp              = $2,
+                   adresa_domiciliu = 'Date șterse (GDPR art.17)',
+                   cod_postal       = NULL,
+                   iban             = NULL,
+                   telefon          = NULL,
+                   email            = NULL,
+                   updated_at       = NOW()
+               WHERE id = $1"#,
+        )
+        .bind(id)
+        .bind(&pseudo_cnp)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 }
