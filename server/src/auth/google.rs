@@ -49,7 +49,7 @@ pub async fn verify_google_id_token(
         return Err(GoogleAuthError::AudienceMismatch(token_info.aud.clone()));
     }
 
-    // Verify the token hasn't expired (belt-and-suspenders — Google also checks this)
+    // Verify the token hasn't expired
     let exp: i64 = token_info
         .exp
         .parse()

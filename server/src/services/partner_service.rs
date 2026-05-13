@@ -8,54 +8,62 @@ use uuid::Uuid;
 use crate::models::partner_model::{EntityType, Partner, PartnerType};
 
 const SELECT_COLS: &str = "
-    SELECT id, denumire, cod_fiscal, numar_reg_com,
-           tip::text AS tip,
+    SELECT id, denumire, cod_fiscal,
+           numar_in_registrul_comertului,
+           tip::text          AS tip,
            tip_entitate::text AS tip_entitate,
            adresa, cod_postal, oras, tara,
            email, telefon, iban,
            persoana_fizica_id, persoana_juridica_id,
+           owner_pf_id, owner_pj_id,
            created_by, created_at, updated_at
     FROM partener
 ";
 
 const CREATE_QUERY: &str = "
     INSERT INTO partener
-        (id, denumire, cod_fiscal, numar_reg_com,
+        (id, denumire, cod_fiscal, numar_in_registrul_comertului,
          tip, tip_entitate,
          adresa, cod_postal, oras, tara,
          email, telefon, iban,
          persoana_fizica_id, persoana_juridica_id,
+         owner_pf_id, owner_pj_id,
          created_by, created_at, updated_at)
     VALUES ($1,$2,$3,$4,
             $5::tip_partener, $6::tip_entitate,
             $7,$8,$9,$10,
             $11,$12,$13,
             $14,$15,
-            $16,$17,$18)
-    RETURNING id, denumire, cod_fiscal, numar_reg_com,
-              tip::text AS tip,
+            $16,$17,
+            $18,$19,$20)
+    RETURNING id, denumire, cod_fiscal,
+              numar_in_registrul_comertului,
+              tip::text          AS tip,
               tip_entitate::text AS tip_entitate,
               adresa, cod_postal, oras, tara,
               email, telefon, iban,
               persoana_fizica_id, persoana_juridica_id,
+              owner_pf_id, owner_pj_id,
               created_by, created_at, updated_at
 ";
 
 const UPDATE_QUERY: &str = "
     UPDATE partener
-    SET denumire=$1, cod_fiscal=$2, numar_reg_com=$3,
+    SET denumire=$1, cod_fiscal=$2, numar_in_registrul_comertului=$3,
         tip=$4::tip_partener, tip_entitate=$5::tip_entitate,
         adresa=$6, cod_postal=$7, oras=$8, tara=$9,
         email=$10, telefon=$11, iban=$12,
         persoana_fizica_id=$13, persoana_juridica_id=$14,
         updated_at=$15
     WHERE id=$16 AND created_by=$17
-    RETURNING id, denumire, cod_fiscal, numar_reg_com,
-              tip::text AS tip,
+    RETURNING id, denumire, cod_fiscal,
+              numar_in_registrul_comertului,
+              tip::text          AS tip,
               tip_entitate::text AS tip_entitate,
               adresa, cod_postal, oras, tara,
               email, telefon, iban,
               persoana_fizica_id, persoana_juridica_id,
+              owner_pf_id, owner_pj_id,
               created_by, created_at, updated_at
 ";
 
@@ -78,6 +86,8 @@ struct PartnerRow {
     iban: Option<String>,
     persoana_fizica_id: Option<Uuid>,
     persoana_juridica_id: Option<Uuid>,
+    owner_pf_id: Option<Uuid>,
+    owner_pj_id: Option<Uuid>,
     created_by: Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
@@ -115,6 +125,8 @@ fn row_to_model(row: PartnerRow) -> Result<Partner, sqlx::Error> {
         iban: row.iban,
         persoana_fizica_id: row.persoana_fizica_id,
         persoana_juridica_id: row.persoana_juridica_id,
+        owner_pf_id: row.owner_pf_id,
+        owner_pj_id: row.owner_pj_id,
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -136,9 +148,20 @@ fn tip_entitate_str(t: EntityType) -> &'static str {
     }
 }
 
+// ============================================================================
+// TRAIT
+// ============================================================================
+
 #[async_trait]
 pub trait PartnerRepository: Send + Sync {
-    async fn find_all_for_user(&self, user_id: Uuid) -> Result<Vec<Partner>, sqlx::Error>;
+    /// Entity-scoped: returns partners owned by the given PF or PJ entity.
+    async fn find_all_for_entity(
+        &self,
+        user_id: Uuid,
+        entity_type: &str,
+        entity_id: Uuid,
+    ) -> Result<Vec<Partner>, sqlx::Error>;
+
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Partner>, sqlx::Error>;
     async fn create(&self, partner: Partner) -> Result<Partner, sqlx::Error>;
     async fn update(
@@ -152,6 +175,10 @@ pub trait PartnerRepository: Send + Sync {
 
 pub type DynPartnerRepository = Arc<dyn PartnerRepository>;
 
+// ============================================================================
+// POSTGRES IMPLEMENTATION
+// ============================================================================
+
 pub struct PgPartnerRepository {
     pool: PgPool,
 }
@@ -164,14 +191,25 @@ impl PgPartnerRepository {
 
 #[async_trait]
 impl PartnerRepository for PgPartnerRepository {
-    async fn find_all_for_user(&self, user_id: Uuid) -> Result<Vec<Partner>, sqlx::Error> {
-        let rows = sqlx::query_as::<_, PartnerRow>(&format!(
-            "{SELECT_COLS} WHERE created_by = $1 ORDER BY denumire ASC"
-        ))
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
+    async fn find_all_for_entity(
+        &self,
+        user_id: Uuid,
+        entity_type: &str,
+        entity_id: Uuid,
+    ) -> Result<Vec<Partner>, sqlx::Error> {
+        let sql = match entity_type {
+            "PF" => format!(
+                "{SELECT_COLS} WHERE created_by = $1 AND owner_pf_id = $2 ORDER BY denumire ASC"
+            ),
+            _ => format!(
+                "{SELECT_COLS} WHERE created_by = $1 AND owner_pj_id = $2 ORDER BY denumire ASC"
+            ),
+        };
+        let rows = sqlx::query_as::<_, PartnerRow>(&sql)
+            .bind(user_id)
+            .bind(entity_id)
+            .fetch_all(&self.pool)
+            .await?;
         rows.into_iter().map(row_to_model).collect()
     }
 
@@ -180,7 +218,6 @@ impl PartnerRepository for PgPartnerRepository {
             .bind(id)
             .fetch_optional(&self.pool)
             .await?;
-
         row.map(row_to_model).transpose()
     }
 
@@ -201,12 +238,13 @@ impl PartnerRepository for PgPartnerRepository {
             .bind(&p.iban)
             .bind(p.persoana_fizica_id)
             .bind(p.persoana_juridica_id)
+            .bind(p.owner_pf_id)
+            .bind(p.owner_pj_id)
             .bind(p.created_by)
             .bind(p.created_at)
             .bind(p.updated_at)
             .fetch_one(&self.pool)
             .await?;
-
         row_to_model(row)
     }
 
@@ -236,7 +274,6 @@ impl PartnerRepository for PgPartnerRepository {
             .bind(user_id)
             .fetch_optional(&self.pool)
             .await?;
-
         row.map(row_to_model).transpose()
     }
 
@@ -246,7 +283,6 @@ impl PartnerRepository for PgPartnerRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await?;
-
         Ok(result.rows_affected() > 0)
     }
 }

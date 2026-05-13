@@ -104,23 +104,55 @@ pub struct PersoanaJuridica {
 /// Request body used for both create and update operations.
 #[derive(Debug, Deserialize, Validate)]
 pub struct PersoanaJuridicaRequest {
-    // TODO: Implement validation for those fields
+    #[validate(custom(function = "validate_cod_fiscal"))]
     pub cod_fiscal: String,
+
+    #[validate(length(min = 1, max = 200, message = "Denumire trebuie să aibă 1-200 caractere"))]
     pub denumire: String,
+
+    #[validate(custom(function = "validate_nr_reg_com"))]
     pub numar_de_inregistrare_in_registrul_comertului: String,
+
+    #[validate(range(min = 1800, max = 2100, message = "An înfiinţare invalid"))]
     pub an_infiintare: i32,
+
+    #[validate(length(min = 1, max = 200, message = "Adresa trebuie să aibă 1-200 caractere"))]
     pub adresa_sediu_social: String,
+
+    #[validate(custom(function = "validate_cod_postal"))]
     pub cod_postal: Option<String>,
+
     pub adresa_puncte_de_lucru: Option<Vec<String>>,
+
+    #[validate(custom(function = "validate_iban"))]
     pub iban: String,
+
+    #[validate(custom(function = "validate_telefon"))]
     pub telefon: Option<String>,
+
+    #[validate(email(message = "Format email invalid"))]
+    #[validate(length(max = 100, message = "Email max 100 caractere"))]
     pub email: Option<String>,
+
+    #[validate(custom(function = "validate_caen"))]
     pub cod_caen_principal: String,
+
     pub coduri_caen_secundare: Option<Vec<String>>,
+
+    #[validate(range(min = 0, message = "Numărul de angajați nu poate fi negativ"))]
     pub numar_angajati: i32,
+
+    #[validate(range(min = 1.0, message = "Capital social trebuie să fie cel puțin 1 RON"))]
     pub capital_social: f64,
+
     pub stare: Option<StarePersoanaJuridica>,
+
+    #[validate(length(max = 100, message = "Wallet max 100 caractere"))]
     pub wallet: String,
+}
+
+fn normalize_iban(iban: &str) -> String {
+    iban.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_uppercase()
 }
 
 impl PersoanaJuridica {
@@ -179,7 +211,7 @@ impl PersoanaJuridica {
             adresa_sediu_social: req.adresa_sediu_social.clone(),
             cod_postal: req.cod_postal.clone(),
             adresa_puncte_de_lucru: req.adresa_puncte_de_lucru.clone(),
-            iban: req.iban.clone(),
+            iban: normalize_iban(&req.iban),
             telefon: req.telefon.clone(),
             email: req.email.clone(),
             cod_caen_principal: req.cod_caen_principal.clone(),
@@ -207,7 +239,7 @@ impl PersoanaJuridica {
             adresa_sediu_social: req.adresa_sediu_social.clone(),
             cod_postal: req.cod_postal.clone(),
             adresa_puncte_de_lucru: req.adresa_puncte_de_lucru.clone(),
-            iban: req.iban.clone(),
+            iban: normalize_iban(&req.iban),
             telefon: req.telefon.clone(),
             email: req.email.clone(),
             cod_caen_principal: req.cod_caen_principal.clone(),

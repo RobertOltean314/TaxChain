@@ -5,7 +5,35 @@ use validator::Validate;
 
 use crate::auth::middleware::require_role;
 use crate::models::{Partner, PartnerRequest, UserRole};
+use crate::models::audit_model::CreateAuditEntry;
+use crate::models::entity_model::EntityContext;
+use crate::services::audit_service::DynAuditRepository;
 use crate::services::partner_service::DynPartnerRepository;
+
+fn extract_entity(req: &HttpRequest) -> Result<EntityContext, HttpResponse> {
+    let entity_type = req
+        .headers()
+        .get("X-Entity-Type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_uppercase())
+        .filter(|s| s == "PF" || s == "PJ")
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Type header"}))
+        })?;
+
+    let entity_id = req
+        .headers()
+        .get("X-Entity-Id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Id header"}))
+        })?;
+
+    Ok(EntityContext { entity_type, entity_id })
+}
 
 #[get("")]
 pub async fn find_all_partener(
@@ -14,7 +42,7 @@ pub async fn find_all_partener(
 ) -> impl Responder {
     let user = match require_role(
         &req,
-        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+        &[UserRole::Admin, UserRole::Taxpayer],
     ) {
         Ok(u) => u,
         Err(resp) => return resp,
@@ -28,7 +56,12 @@ pub async fn find_all_partener(
         }
     };
 
-    match repo.find_all_for_user(user_id).await {
+    let ctx = match extract_entity(&req) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+
+    match repo.find_all_for_entity(user_id, &ctx.entity_type, ctx.entity_id).await {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
             eprintln!("find_all_partener error: {e}");
@@ -49,7 +82,7 @@ pub async fn get_partener_by_id(
 ) -> impl Responder {
     if let Err(resp) = require_role(
         &req,
-        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+        &[UserRole::Admin, UserRole::Taxpayer],
     ) {
         return resp;
     }
@@ -76,6 +109,7 @@ pub async fn get_partener_by_id(
 pub async fn create_partener(
     req: HttpRequest,
     repo: web::Data<DynPartnerRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
     body: web::Json<PartnerRequest>,
 ) -> impl Responder {
     let user = match require_role(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
@@ -98,10 +132,38 @@ pub async fn create_partener(
         }
     };
 
-    let partener = Partner::from_request(body.into_inner(), user_id);
+    let ctx = match extract_entity(&req) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    let (owner_pf_id, owner_pj_id) = match ctx.entity_type.as_str() {
+        "PF" => (Some(ctx.entity_id), None),
+        _ => (None, Some(ctx.entity_id)),
+    };
+    let partener = Partner::from_request(body.into_inner(), user_id, owner_pf_id, owner_pj_id);
 
     match repo.create(partener).await {
-        Ok(created) => HttpResponse::Created().json(created),
+        Ok(created) => {
+            let audit = audit_repo.clone();
+            let partner_id = created.id;
+            let name = created.denumire.clone();
+            let cod_fiscal = created.cod_fiscal.clone().unwrap_or_default();
+            let tip = format!("{:?}", created.tip);
+            let entity_type = ctx.entity_type.clone();
+            let entity_id = ctx.entity_id;
+            actix_web::rt::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "partner.created",
+                    actor_user_id: user_id,
+                    entity_type: Some(entity_type),
+                    entity_id: Some(entity_id),
+                    resource_type: "partner",
+                    resource_id: Some(partner_id),
+                    payload: json!({ "name": name, "cod_fiscal": cod_fiscal, "tip": tip }),
+                }).await;
+            });
+            HttpResponse::Created().json(created)
+        }
         Err(e) => {
             eprintln!("create_partener error: {e}");
             HttpResponse::InternalServerError().json(json!({
@@ -118,6 +180,7 @@ pub async fn create_partener(
 pub async fn update_partener(
     req: HttpRequest,
     repo: web::Data<DynPartnerRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
     path: web::Path<Uuid>,
     body: web::Json<PartnerRequest>,
 ) -> impl Responder {
@@ -167,8 +230,29 @@ pub async fn update_partener(
 
     let updated = Partner::update_from_request(&existing, body.into_inner());
 
+    let ctx = extract_entity(&req).ok();
+
     match repo.update(id, updated, user_id).await {
-        Ok(Some(p)) => HttpResponse::Ok().json(p),
+        Ok(Some(p)) => {
+            let audit = audit_repo.clone();
+            let name = p.denumire.clone();
+            let cod_fiscal = p.cod_fiscal.clone().unwrap_or_default();
+            let (entity_type, entity_id) = ctx
+                .map(|c| (Some(c.entity_type), Some(c.entity_id)))
+                .unwrap_or((None, None));
+            actix_web::rt::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "partner.updated",
+                    actor_user_id: user_id,
+                    entity_type,
+                    entity_id,
+                    resource_type: "partner",
+                    resource_id: Some(id),
+                    payload: json!({ "name": name, "cod_fiscal": cod_fiscal }),
+                }).await;
+            });
+            HttpResponse::Ok().json(p)
+        }
         Ok(None) => HttpResponse::NotFound().json(json!({
             "error": format!("Partener with id {} not found", id)
         })),
@@ -187,6 +271,7 @@ pub async fn update_partener(
 pub async fn delete_partener(
     req: HttpRequest,
     repo: web::Data<DynPartnerRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
     path: web::Path<Uuid>,
 ) -> impl Responder {
     let user = match require_role(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
@@ -225,8 +310,29 @@ pub async fn delete_partener(
         }));
     }
 
+    let ctx = extract_entity(&req).ok();
+    let partner_name = existing.denumire.clone();
+    let partner_fiscal = existing.cod_fiscal.clone().unwrap_or_default();
+
     match repo.delete(id, user_id).await {
-        Ok(true) => HttpResponse::NoContent().finish(),
+        Ok(true) => {
+            let audit = audit_repo.clone();
+            let (entity_type, entity_id) = ctx
+                .map(|c| (Some(c.entity_type), Some(c.entity_id)))
+                .unwrap_or((None, None));
+            actix_web::rt::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "partner.deleted",
+                    actor_user_id: user_id,
+                    entity_type,
+                    entity_id,
+                    resource_type: "partner",
+                    resource_id: Some(id),
+                    payload: json!({ "name": partner_name, "cod_fiscal": partner_fiscal }),
+                }).await;
+            });
+            HttpResponse::NoContent().finish()
+        }
         Ok(false) => HttpResponse::NotFound().json(json!({
             "error": format!("Partener with id {} not found", id)
         })),

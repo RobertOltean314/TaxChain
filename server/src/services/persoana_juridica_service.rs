@@ -70,6 +70,8 @@ pub trait PersoanaJuridicaRepository: Send + Sync {
     async fn create(&self, persoana: PersoanaJuridica) -> Result<PersoanaJuridica, Error>;
     async fn update(&self, persoana: PersoanaJuridica) -> Result<PersoanaJuridica, Error>;
     async fn delete(&self, id: Uuid) -> Result<bool, Error>;
+    /// GDPR right-to-erasure: nullify contact and banking fields for the legal entity.
+    async fn erase_personal_data(&self, id: Uuid) -> Result<bool, Error>;
 }
 
 pub type DynPersoanaJuridicaRepository = Arc<dyn PersoanaJuridicaRepository>;
@@ -208,6 +210,21 @@ impl PersoanaJuridicaRepository for PgPersoanaJuridicaRepository {
             .bind(id)
             .execute(&self.pool)
             .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    async fn erase_personal_data(&self, id: Uuid) -> Result<bool, Error> {
+        let result = sqlx::query(
+            r#"UPDATE persoana_juridica
+               SET iban       = NULL,
+                   telefon    = NULL,
+                   email      = NULL,
+                   updated_at = NOW()
+               WHERE id = $1"#,
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 }

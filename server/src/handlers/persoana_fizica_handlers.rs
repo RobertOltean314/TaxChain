@@ -4,7 +4,9 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::auth::middleware::require_role;
+use crate::models::audit_model::CreateAuditEntry;
 use crate::models::{PersoanaFizica, PersoanaFizicaRequest, UserRole};
+use crate::services::audit_service::DynAuditRepository;
 use crate::services::persoana_fizica_service::DynPersoanaFizicaRepository;
 
 /// GET /persoana-fizica — returns all records.
@@ -13,7 +15,7 @@ pub async fn find_all_persoana_fizica(
     req: HttpRequest,
     repo: web::Data<DynPersoanaFizicaRepository>,
 ) -> impl Responder {
-    if let Err(resp) = require_role(&req, &[UserRole::Admin, UserRole::Auditor]) {
+    if let Err(resp) = require_role(&req, &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer]) {
         return resp;
     }
 
@@ -68,28 +70,90 @@ pub async fn get_persoana_fizica_by_id(
 }
 
 /// POST /persoana-fizica — creates a new record.
+/// Admin: can create for anyone.
+/// Taxpayer: can create their own during onboarding (only if they don't have one yet).
 #[post("")]
 pub async fn create_persoana_fizica(
     req: HttpRequest,
     repo: web::Data<DynPersoanaFizicaRepository>,
+    user_repo: web::Data<crate::services::user_service::DynUserRepository>,
     body: web::Json<PersoanaFizicaRequest>,
 ) -> impl Responder {
-    if let Err(resp) = require_role(&req, &[UserRole::Admin]) {
-        return resp;
+    let user = match require_role(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
+    // Taxpayer can only create their own PersoanaFizica during onboarding
+    if user.claims().role == UserRole::Taxpayer {
+        if let Some(_) = user.claims().persoana_fizica_id {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "You already have a PersoanaFizica record. Contact an administrator to modify it."
+            }));
+        }
     }
 
     if let Err(errors) = body.validate() {
-        return HttpResponse::UnprocessableEntity().body(errors.to_string());
+        eprintln!("Validation errors: {:?}", errors);
+        let error_messages: Vec<String> = errors
+            .field_errors()
+            .iter()
+            .flat_map(|(field, errs)| {
+                errs.iter().map(move |err| {
+                    format!(
+                        "{}: {}",
+                        field,
+                        err.message.as_deref().unwrap_or("validation failed")
+                    )
+                })
+            })
+            .collect();
+        return HttpResponse::UnprocessableEntity().json(json!({
+            "error": "Validation failed",
+            "details": error_messages
+        }));
     }
 
     let persoana = PersoanaFizica::from_request(body.into_inner());
 
-    match repo.create(persoana).await {
-        Ok(created) => HttpResponse::Created().json(created),
+    match repo.create(persoana.clone()).await {
+        Ok(created) => {
+            // If a Taxpayer created this, automatically link it to their account
+            if user.claims().role == UserRole::Taxpayer {
+                if let Ok(user_id) = Uuid::parse_str(&user.claims().sub) {
+                    let _ = user_repo
+                        .update_entity_links(
+                            user_id,
+                            Some(created.id),
+                            user.claims().persoana_juridica_id, // Preserve existing juridica ID
+                        )
+                        .await;
+                }
+            }
+
+            HttpResponse::Created().json(created)
+        }
         Err(e) => {
             eprintln!("create error: {e}");
-            let error_body = json!({"error": "We failed to create the Persoana Fizica Entity. Please review the details", "details": e.to_string()});
-            HttpResponse::InternalServerError().json(error_body)
+
+            // Convert database constraint violations to user-friendly validation errors.
+            // The application already validates the phone format; this only maps DB constraint failures.
+            let error_message = if e.to_string().contains("persoana_fizica_cnp_key") {
+                "A person with this CNP already exists"
+            } else if e.to_string().contains("persoana_fizica_telefon_check") {
+                "Phone number format is invalid. Expected format: +407xxxxxxxx or 07xxxxxxxx"
+            } else if e.to_string().contains("persoana_fizica_email_check") {
+                "Email format is invalid"
+            } else if e.to_string().contains("persoana_fizica_iban_key") {
+                "This IBAN is already registered to another account"
+            } else {
+                "Failed to create PersoanaFizica. Please check your input data."
+            };
+
+            HttpResponse::UnprocessableEntity().json(json!({
+                "error": "Validation failed",
+                "details": [error_message]
+            }))
         }
     }
 }
@@ -144,6 +208,55 @@ pub async fn update_persoana_fizica(
             eprintln!("update error: {e}");
             let error_body = json!({"error": format!("We failed to update the Persoana Fizica entity with id {}, please review the details for more information", id), "details": e.to_string()});
             HttpResponse::InternalServerError().json(error_body)
+        }
+    }
+}
+
+/// POST /persoana-fizica/{id}/stergere-date — GDPR right-to-erasure (Admin only).
+///
+/// Pseudonymises the CNP and nullifies contact + banking fields. The record is kept
+/// for fiscal integrity (invoices reference the entity) but identifying data is removed.
+#[post("/{id}/stergere-date")]
+pub async fn erase_persoana_fizica_date(
+    req: HttpRequest,
+    repo: web::Data<DynPersoanaFizicaRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
+    path: web::Path<Uuid>,
+) -> impl Responder {
+    let user = match require_role(&req, &[UserRole::Admin]) {
+        Ok(u) => u,
+        Err(resp) => return resp,
+    };
+
+    let id = path.into_inner();
+    let user_id = match user.claims().user_id() {
+        Ok(uid) => uid,
+        Err(_) => return HttpResponse::InternalServerError().json(json!({"error": "Invalid JWT"})),
+    };
+
+    match repo.erase_personal_data(id).await {
+        Ok(true) => {
+            let audit = audit_repo.clone();
+            actix_web::rt::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "pf.gdpr_erasure",
+                    actor_user_id: user_id,
+                    entity_type: Some("PF".into()),
+                    entity_id: Some(id),
+                    resource_type: "persoana_fizica",
+                    resource_id: Some(id),
+                    payload: json!({ "gdpr_article": "17", "fields_erased": ["cnp","adresa_domiciliu","cod_postal","iban","telefon","email"] }),
+                }).await;
+            });
+            HttpResponse::Ok().json(json!({
+                "success": true,
+                "message": "Datele personale au fost șterse conform GDPR art. 17 (dreptul la ștergere)."
+            }))
+        }
+        Ok(false) => HttpResponse::NotFound().json(json!({"error": format!("PersoanaFizica {} not found", id)})),
+        Err(e) => {
+            eprintln!("erase_persoana_fizica_date error: {e}");
+            HttpResponse::InternalServerError().json(json!({"error": "Eroare la ștergerea datelor personale", "details": e.to_string()}))
         }
     }
 }

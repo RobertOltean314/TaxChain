@@ -54,7 +54,9 @@ mod test {
     }
 
     #[actix_web::test]
-    async fn test_create_returns_500_on_internal_error() {
+    async fn test_create_returns_422_on_db_error() {
+        // The handler maps all DB errors to 422 with a user-friendly message
+        // rather than leaking internal server errors to the client.
         let app = build_app(MockBehaviour::InternalServerError).await;
         let req = test::TestRequest::post()
             .uri("/persoana-fizica")
@@ -62,12 +64,9 @@ mod test {
             .to_request();
         let res = test::call_service(&app, req).await;
 
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 
-        let body = test::read_body(res).await;
-        assert!(
-            !body.is_empty(),
-            "Expected error JSON body on internal server error"
-        );
+        let body: serde_json::Value = test::read_body_json(res).await;
+        assert_eq!(body["error"], "Validation failed");
     }
 }

@@ -1,287 +1,301 @@
-import { useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { persoanaFizicaSchema, type PersoanaFizicaFormValues } from '../validation/schemas';
-import { persoanaFizicaApi } from '../api/persoanaFizica.api';
-import { AppLayout } from '../components/ui/AppLayout';
-import { useToast } from '../components/ui/Toast';
-import { useAuth } from '../auth/useAuth';
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  persoanaFizicaSchema,
+  type PersoanaFizicaFormValues,
+} from "../validation";
+import { persoanaFizicaApi } from "../api/persoanaFizica.api";
+import { useToast } from "../components/ui/Toast";
+import { AppLayout } from "../components/ui/AppLayout";
+import {
+  PageHeader,
+  FormField,
+  Input,
+  Select,
+  Button,
+} from "../components/ui/ui";
 
-// ─── Reusable field components ─────────────────────────────────────────────────
-
-function Field({
-  label,
-  error,
-  required,
-  children,
-}: {
-  label: string;
-  error?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="input-label">
-        {label}
-        {required && <span className="text-danger ml-0.5">*</span>}
-      </label>
-      {children}
-      {error && <p className="input-error">{error}</p>}
-    </div>
-  );
-}
-
-// ─── Main Form ─────────────────────────────────────────────────────────────────
-
-export function PersoanaFizicaFormPage() {
-  const { id } = useParams<{ id: string }>();
-  const isEdit = !!id;
+export default function PersoanaFizicaFormPage() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isReadOnly = user?.role === 'Auditor';
+  const isEdit = !!id && id !== "new";
 
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<PersoanaFizicaFormValues>({
     resolver: zodResolver(persoanaFizicaSchema),
-    defaultValues: { stare: 'Activ' },
+    defaultValues: {
+      sex: "M",
+      stare: "Activ",
+    },
   });
 
   useEffect(() => {
     if (!isEdit) return;
-    const load = async () => {
+    (async () => {
       try {
-        const data = await persoanaFizicaApi.getById(id);
+        const data = await persoanaFizicaApi.getById(id!);
         reset({
           cnp: data.cnp,
           nume: data.nume,
           prenume: data.prenume,
-          prenume_tata: data.prenume_tata ?? '',
+          prenume_tata: data.prenume_tata || undefined,
           data_nasterii: data.data_nasterii,
           sex: data.sex,
           adresa_domiciliu: data.adresa_domiciliu,
-          cod_postal: data.cod_postal ?? '',
+          cod_postal: data.cod_postal || undefined,
           iban: data.iban,
-          telefon: data.telefon ?? '',
-          email: data.email ?? '',
+          telefon: data.telefon || undefined,
+          email: data.email || undefined,
           stare: data.stare,
-          wallet: data.wallet ?? '',
         });
-      } catch {
-        toast('Eroare la încărcarea înregistrării', 'error');
-        navigate('/persoane-fizice');
+      } catch (e: any) {
+        toast("Eroare la încărcare.", "err");
+        navigate("/persoane-fizice");
       }
-    };
-    load();
-  }, [id, isEdit, reset, toast, navigate]);
+    })();
+  }, [id, isEdit, reset, navigate, toast]);
 
   const onSubmit = async (values: PersoanaFizicaFormValues) => {
     try {
       if (isEdit) {
-        await persoanaFizicaApi.update(id, values);
-        toast('Înregistrare actualizată cu succes', 'success');
+        await persoanaFizicaApi.update(id!, values);
+        toast("Persoană fizică actualizată cu succes.", "ok");
       } else {
         await persoanaFizicaApi.create(values);
-        toast('Înregistrare creată cu succes', 'success');
+        toast("Persoană fizică creată cu succes.", "ok");
       }
-      navigate('/persoane-fizice');
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Eroare la salvarea datelor';
-      toast(msg, 'error');
+      navigate("/persoane-fizice");
+    } catch (e: any) {
+      const errorMsg =
+        e?.response?.data?.error ??
+        e?.response?.data?.details ??
+        "Eroare la salvare.";
+      toast(errorMsg, "err");
     }
   };
 
-  const e = errors;
-
   return (
     <AppLayout>
-      <div className="p-8 max-w-3xl">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => navigate('/persoane-fizice')}
-            className="text-slate-400 hover:text-white transition-colors text-sm"
+      <div className="w-full max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8 fade-up">
+        <PageHeader
+          title={
+            isEdit ? "Editare Persoană Fizică" : "Adaugare Persoană Fizică"
+          }
+          subtitle={isEdit ? `ID: ${id}` : undefined}
+        />
+
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="rounded-xl border p-8"
+          style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+        >
+          {/* ── Identificare ── */}
+          <div
+            className="mb-8 pb-8 border-b"
+            style={{ borderColor: "var(--border)" }}
           >
-            ← Înapoi
-          </button>
-          <div>
-            <h1 className="font-display text-2xl text-white">
-              {isEdit ? 'Editare Persoană Fizică' : 'Persoană Fizică Nouă'}
-            </h1>
-            {isReadOnly && (
-              <p className="text-xs text-warning mt-0.5">Vizualizare (mod auditor)</p>
-            )}
-          </div>
-        </div>
+            <h3
+              className="text-sm font-semibold uppercase tracking-wider mb-6"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Identificare Personală
+            </h3>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Section: Identificare */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Identificare
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="CNP" error={e.cnp?.message} required>
-                <input
-                  {...register('cnp')}
-                  className="input-field"
-                  placeholder="1234567890123"
-                  maxLength={13}
-                  readOnly={isReadOnly}
+            <FormField label="CNP" required error={errors.cnp?.message}>
+              <Input
+                {...register("cnp")}
+                placeholder="1234567890123"
+                maxLength={13}
+                error={!!errors.cnp}
+              />
+            </FormField>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField label="Nume" required error={errors.nume?.message}>
+                <Input
+                  {...register("nume")}
+                  placeholder="Acasă"
+                  error={!!errors.nume}
                 />
-              </Field>
-              <Field label="Sex" error={e.sex?.message} required>
-                <select {...register('sex')} className="input-field" disabled={isReadOnly}>
-                  <option value="">Selectați</option>
-                  <option value="M">Masculin</option>
-                  <option value="F">Feminin</option>
-                </select>
-              </Field>
-              <Field label="Nume" error={e.nume?.message} required>
-                <input
-                  {...register('nume')}
-                  className="input-field"
-                  placeholder="Popescu"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Prenume" error={e.prenume?.message} required>
-                <input
-                  {...register('prenume')}
-                  className="input-field"
+              </FormField>
+
+              <FormField
+                label="Prenume"
+                required
+                error={errors.prenume?.message}
+              >
+                <Input
+                  {...register("prenume")}
                   placeholder="Ion"
-                  readOnly={isReadOnly}
+                  error={!!errors.prenume}
                 />
-              </Field>
-              <Field label="Prenumele tatălui" error={e.prenume_tata?.message}>
-                <input
-                  {...register('prenume_tata')}
-                  className="input-field"
-                  placeholder="Gheorghe (opțional)"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Data nașterii" error={e.data_nasterii?.message} required>
-                <input
-                  {...register('data_nasterii')}
+              </FormField>
+            </div>
+
+            <FormField
+              label="Prenumele tatălui"
+              error={errors.prenume_tata?.message}
+            >
+              <Input
+                {...register("prenume_tata")}
+                placeholder="Gheorghe"
+                error={!!errors.prenume_tata}
+              />
+            </FormField>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField
+                label="Data Nașterii"
+                required
+                error={errors.data_nasterii?.message}
+              >
+                <Input
+                  {...register("data_nasterii")}
                   type="date"
-                  className="input-field"
-                  readOnly={isReadOnly}
+                  error={!!errors.data_nasterii}
                 />
-              </Field>
-            </div>
-          </fieldset>
+              </FormField>
 
-          {/* Section: Contact & Adresă */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Contact & Adresă
-            </legend>
-            <Field label="Adresă domiciliu" error={e.adresa_domiciliu?.message} required>
-              <input
-                {...register('adresa_domiciliu')}
-                className="input-field"
-                placeholder="Str. Exemplu, nr. 1, București"
-                readOnly={isReadOnly}
+              <FormField label="Sexul" required error={errors.sex?.message}>
+                <Select
+                  {...register("sex")}
+                  options={[
+                    { value: "M", label: "Masculin" },
+                    { value: "F", label: "Feminin" },
+                  ]}
+                  error={!!errors.sex}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* ── Adresă ── */}
+          <div
+            className="mb-8 pb-8 border-b"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <h3
+              className="text-sm font-semibold uppercase tracking-wider mb-6"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Adresă & Contact
+            </h3>
+
+            <FormField
+              label="Adresa Domiciliu"
+              required
+              error={errors.adresa_domiciliu?.message}
+            >
+              <Input
+                {...register("adresa_domiciliu")}
+                placeholder="Str. Principale, nr. 123, Apt. 45"
+                error={!!errors.adresa_domiciliu}
               />
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cod poștal" error={e.cod_postal?.message}>
-                <input
-                  {...register('cod_postal')}
-                  className="input-field"
-                  placeholder="010101"
+            </FormField>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField label="Cod Poștal" error={errors.cod_postal?.message}>
+                <Input
+                  {...register("cod_postal")}
+                  placeholder="012345"
                   maxLength={6}
-                  readOnly={isReadOnly}
+                  error={!!errors.cod_postal}
                 />
-              </Field>
-              <Field label="Telefon" error={e.telefon?.message}>
-                <input
-                  {...register('telefon')}
-                  className="input-field"
-                  placeholder="+40712345678"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Email" error={e.email?.message}>
-                <input
-                  {...register('email')}
-                  type="email"
-                  className="input-field"
-                  placeholder="ion@exemplu.ro"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-            </div>
-          </fieldset>
+              </FormField>
 
-          {/* Section: Financiar */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Financiar & Status
-            </legend>
-            <Field label="IBAN" error={e.iban?.message} required>
-              <input
-                {...register('iban')}
-                className="input-field font-mono"
-                placeholder="RO49AAAA1B31007593840000"
-                readOnly={isReadOnly}
+              <FormField label="Telefon" error={errors.telefon?.message}>
+                <Input
+                  {...register("telefon")}
+                  placeholder="+40 700 000 000"
+                  type="tel"
+                  error={!!errors.telefon}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Email" error={errors.email?.message}>
+              <Input
+                {...register("email")}
+                placeholder="ion.acasă@example.com"
+                type="email"
+                error={!!errors.email}
               />
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Stare" error={e.stare?.message}>
-                <select {...register('stare')} className="input-field" disabled={isReadOnly}>
-                  <option value="Activ">Activ</option>
-                  <option value="Inactiv">Inactiv</option>
-                  <option value="Suspendat">Suspendat</option>
-                </select>
-              </Field>
-              <Field label="Adresă Wallet" error={e.wallet?.message}>
-                <input
-                  {...register('wallet')}
-                  className="input-field font-mono text-xs"
-                  placeholder="0x... (opțional)"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-            </div>
-          </fieldset>
+            </FormField>
+          </div>
 
-          {/* Actions */}
-          {!isReadOnly && (
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
-                    Se salvează...
-                  </span>
-                ) : isEdit ? (
-                  'Salvează modificările'
-                ) : (
-                  'Creează înregistrarea'
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => navigate('/persoane-fizice')}
-              >
-                Anulează
-              </button>
-            </div>
-          )}
+          {/* ── Detalii Financiare ── */}
+          <div
+            className="mb-8 pb-8 border-b"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <h3
+              className="text-sm font-semibold uppercase tracking-wider mb-6"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Detalii Financiare
+            </h3>
+
+            <FormField label="IBAN" required error={errors.iban?.message}>
+              <Input
+                {...register("iban")}
+                placeholder="ROXX XXXX XXXX XXXX XXXX XXXX"
+                className="font-mono"
+                error={!!errors.iban}
+              />
+            </FormField>
+          </div>
+
+          {/* ── Stare ── */}
+          <div className="mb-8">
+            <h3
+              className="text-sm font-semibold uppercase tracking-wider mb-6"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Status
+            </h3>
+
+            <FormField label="Stare" required error={errors.stare?.message}>
+              <Select
+                {...register("stare")}
+                options={[
+                  { value: "Activ", label: "Activ" },
+                  { value: "Inactiv", label: "Inactiv" },
+                  { value: "Suspendat", label: "Suspendat" },
+                ]}
+                error={!!errors.stare}
+              />
+            </FormField>
+          </div>
+
+          {/* ── Actions ── */}
+          <div
+            className="flex items-center gap-3 pt-6 border-t"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSubmitting}
+              disabled={!isDirty}
+            >
+              {isEdit ? "Actualizează" : "Crează"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate("/persoane-fizice")}
+              disabled={isSubmitting}
+            >
+              Anulează
+            </Button>
+          </div>
         </form>
       </div>
     </AppLayout>

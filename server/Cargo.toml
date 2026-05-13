@@ -27,5 +27,16 @@ reqwest       = { version = "0.11", features = ["json"] }
 thiserror = "2.0.18"
 futures-util = "0.3"
 actix-cors = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread"] }
 rust_decimal = { version = "1.36", features = ["serde-with-str"] }
+
+# ZK proof — Groth16 over BN254
+ark-bn254      = "0.4"
+ark-groth16    = "0.4"
+ark-snark      = "0.4"
+ark-relations  = "0.4"
+ark-r1cs-std   = "0.4"
+ark-ff         = "0.4"
+ark-serialize  = "0.4"
+ark-std        = "0.4"
 

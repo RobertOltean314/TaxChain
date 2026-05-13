@@ -1,136 +1,87 @@
+mod startup;
+
 use std::sync::Arc;
 
-use actix_cors::Cors;
-use actix_web::http::header;
-use actix_web::{App, HttpServer, web};
 use reqwest::Client;
+use startup::{AppConfig, AppState, run};
 use taxchain::{
-    auth::middleware::JwtAuthMiddleware,
-    handlers::{
-        auth_handlers::{
-            AuthConfig, google_login_handler, logout, refresh_token_handler, wallet_nonce_handler,
-            wallet_verify_handler,
-        },
-        create_persoana_fizica, create_persoana_juridica, delete_persoana_fizica,
-        delete_persoana_juridica, find_all_persoana_fizica, find_all_persoana_juridica,
-        get_persoana_fizica_by_id,
-        invoice_handlers::{
-            create_invoice, delete_invoice, find_all_invoices, get_invoice_by_id, update_invoice,
-            update_invoice_payment, update_invoice_status,
-        },
-        partner_handlers::{
-            create_partener, delete_partener, find_all_partener, get_partener_by_id,
-            update_partener,
-        },
-        persoana_juridica_handlers::get_persoana_juridica_by_id,
-        update_persoana_fizica, update_persoana_juridica,
-    },
+    blockchain::anchor::AnchorService,
+    handlers::auth_handlers::AuthConfig,
     services::{
-        invoice_service::{DynInvoiceRepository, PgInvoiceRepository},
-        partner_service::{DynPartnerRepository, PgPartnerRepository},
-        persoana_fizica_service::{DynPersoanaFizicaRepository, PgPersoanaFizicaRepository},
-        persoana_juridica_service::{DynPersoanaJuridicaRepository, PgPersoanaJuridicaRepository},
-        user_service::{DynUserRepository, PgUserRepository},
+        audit_service::PgAuditRepository, bnr_service::BnrService,
+        e_factura_service::PgEFacturaRepository, entity_service::PgEntityRepository,
+        invoice_service::PgInvoiceRepository, partner_service::PgPartnerRepository,
+        persoana_fizica_service::PgPersoanaFizicaRepository,
+        persoana_juridica_service::PgPersoanaJuridicaRepository, proof_service::ProofRepository,
+        report_service::ReportService, user_service::PgUserRepository,
     },
-    utils::{io_error, require_env},
+    utils::io_error,
+    zk::ZkService,
 };
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
 
-    let database_url = require_env("DATABASE_URL")?;
-    let jwt_secret = require_env("JWT_SECRET")?;
-    let google_client_id = require_env("GOOGLE_CLIENT_ID")?;
+    let config = AppConfig::from_env()?;
 
-    let access_token_ttl: i64 = 3600;
-    let refresh_token_ttl_days: i64 = 30;
-
-    let pool = sqlx::PgPool::connect(&database_url)
+    //  Database
+    let pool = sqlx::PgPool::connect(&config.database_url)
         .await
         .map_err(|e| io_error(&format!("Failed to connect to the database: {e}")))?;
 
-    let pf_repo: DynPersoanaFizicaRepository =
-        Arc::new(PgPersoanaFizicaRepository::new(pool.clone()));
-    let pj_repo: DynPersoanaJuridicaRepository =
-        Arc::new(PgPersoanaJuridicaRepository::new(pool.clone()));
-    let user_repo: DynUserRepository = Arc::new(PgUserRepository::new(pool.clone()));
-    let partener_repo: DynPartnerRepository = Arc::new(PgPartnerRepository::new(pool.clone()));
-    let invoice_repo: DynInvoiceRepository = Arc::new(PgInvoiceRepository::new(pool.clone()));
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .map_err(|e| io_error(&format!("Migration failed: {e}")))?;
 
-    let auth_config = AuthConfig {
-        jwt_secret,
-        access_token_ttl,
-        refresh_token_ttl_days,
-        google_client_id,
-    };
+    sqlx::query("TRUNCATE TABLE curs_valutar")
+        .execute(&pool)
+        .await
+        .map_err(|e| io_error(&format!("Failed to clear BNR rate cache: {e}")))?;
 
+    // HTTP clients
     let http_client = Client::new();
 
-    HttpServer::new(move || {
-        let cors = Cors::default()
-            .allowed_origin("http://localhost:5173") // Vite dev server
-            .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-            .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE])
-            .max_age(3600);
+    // BNR's SSL certificate is occasionally expired; force HTTP/1.1 because BNR's
+    // server sends TCP RST in response to HTTP/2 ALPN negotiation from Docker.
+    let bnr_http_client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .http1_only()
+        .user_agent("Mozilla/5.0 (compatible; TaxChain/1.0)")
+        .build()
+        .map_err(|e| io_error(&format!("Failed to build BNR HTTP client: {e}")))?;
 
-        App::new()
-            .wrap(cors)
-            .app_data(web::Data::new(pf_repo.clone()))
-            .app_data(web::Data::new(pj_repo.clone()))
-            .app_data(web::Data::new(user_repo.clone()))
-            .app_data(web::Data::new(auth_config.clone()))
-            .app_data(web::Data::new(http_client.clone()))
-            .app_data(web::Data::new(partener_repo.clone()))
-            .app_data(web::Data::new(invoice_repo.clone()))
-            .service(
-                web::scope("/auth")
-                    .service(google_login_handler)
-                    .service(wallet_nonce_handler)
-                    .service(wallet_verify_handler)
-                    .service(refresh_token_handler)
-                    .service(logout),
-            )
-            .service(
-                web::scope("/persoana-fizica")
-                    .wrap(JwtAuthMiddleware)
-                    .service(find_all_persoana_fizica)
-                    .service(get_persoana_fizica_by_id)
-                    .service(create_persoana_fizica)
-                    .service(update_persoana_fizica)
-                    .service(delete_persoana_fizica),
-            )
-            .service(
-                web::scope("/persoana-juridica")
-                    .wrap(JwtAuthMiddleware)
-                    .service(find_all_persoana_juridica)
-                    .service(get_persoana_juridica_by_id)
-                    .service(create_persoana_juridica)
-                    .service(update_persoana_juridica)
-                    .service(delete_persoana_juridica),
-            )
-            .service(
-                web::scope("/partner")
-                    .wrap(JwtAuthMiddleware)
-                    .service(find_all_partener)
-                    .service(get_partener_by_id)
-                    .service(create_partener)
-                    .service(update_partener)
-                    .service(delete_partener),
-            )
-            .service(
-                web::scope("/invoice")
-                    .wrap(JwtAuthMiddleware)
-                    .service(find_all_invoices)
-                    .service(get_invoice_by_id)
-                    .service(create_invoice)
-                    .service(update_invoice)
-                    .service(update_invoice_status)
-                    .service(update_invoice_payment)
-                    .service(delete_invoice),
-            )
-    })
-    .bind(("127.0.0.1", 8080))?
-    .run()
-    .await
+    //  App state
+    let state = AppState {
+        pool: pool.clone(),
+        auth_config: AuthConfig {
+            jwt_secret: config.jwt_secret,
+            access_token_ttl: config.access_token_ttl,
+            refresh_token_ttl_days: config.refresh_token_ttl_days,
+            google_client_id: config.google_client_id,
+        },
+        http_client,
+        pf_repo: Arc::new(PgPersoanaFizicaRepository::new(pool.clone())),
+        pj_repo: Arc::new(PgPersoanaJuridicaRepository::new(pool.clone())),
+        user_repo: Arc::new(PgUserRepository::new(pool.clone())),
+        partener_repo: Arc::new(PgPartnerRepository::new(pool.clone())),
+        invoice_repo: Arc::new(PgInvoiceRepository::new(pool.clone())),
+        efactura_repo: Arc::new(PgEFacturaRepository::new(pool.clone())),
+        entity_repo: Arc::new(PgEntityRepository::new(pool.clone())),
+        bnr_service: Arc::new(BnrService::new(pool.clone(), bnr_http_client)),
+        report_service: Arc::new(ReportService::new(pool.clone())),
+        audit_repo: Arc::new(PgAuditRepository::new(pool.clone())),
+        proof_repo: Arc::new(ProofRepository::new(pool.clone())),
+        zk_service: Arc::new(
+            ZkService::load_or_generate()
+                .map_err(|e| io_error(&format!("Failed to initialize ZK service: {e}")))?,
+        ),
+        anchor_service: Arc::new(
+            AnchorService::new(&config.sepolia_rpc_url, &config.invoice_registry_address)
+                .map_err(|e| io_error(&format!("Failed to init AnchorService: {e}")))?,
+        ),
+    };
+
+    run(state).await
 }

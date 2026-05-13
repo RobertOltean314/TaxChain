@@ -2,12 +2,13 @@ use std::io;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use chrono::Utc;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::models::{
-    DocumentType, Invoice, InvoiceLine, InvoiceLineRequest, InvoiceStatus, VatRate,
+    DocumentType, Invoice, InvoiceLine, InvoiceLineRequest, InvoiceStatus, TransactionType, VatRate,
 };
 
 // ============================================================================
@@ -22,9 +23,7 @@ pub struct InvoiceWithLines {
 }
 
 // ============================================================================
-// SQL — DB columns aliased to English Rust field names
-// NUMERIC columns are cast to ::text so sqlx reads them as String.
-// We parse them to Decimal in the row→model conversion.
+// SQL CONSTANTS
 // ============================================================================
 
 const SELECT_INVOICE: &str = "
@@ -33,6 +32,7 @@ const SELECT_INVOICE: &str = "
         numar              AS number,
         serie              AS series,
         tip_document::text AS document_type,
+        tip_tranzactie::text AS transaction_type,
         stare::text        AS status,
         data_emitere       AS issued_date,
         data_scadenta      AS due_date,
@@ -51,7 +51,13 @@ const SELECT_INVOICE: &str = "
         conditii_plata        AS payment_terms,
         created_by,
         created_at,
-        updated_at
+        updated_at,
+        sent_tx_hash,
+        sent_block_number,
+        sent_anchored_at,
+        tx_hash,
+        block_number,
+        anchored_at
     FROM factura
 ";
 
@@ -77,7 +83,7 @@ const SELECT_LINE: &str = "
 
 const CREATE_INVOICE: &str = "
     INSERT INTO factura
-        (id, numar, serie, tip_document, stare,
+        (id, numar, serie, tip_document, tip_tranzactie, stare,
          data_emitere, data_scadenta, data_livrare,
          emitent_pf_id, emitent_pj_id, partener_id, moneda,
          total_fara_tva, total_tva, total_cu_tva,
@@ -85,18 +91,19 @@ const CREATE_INVOICE: &str = "
          factura_referinta_id, observatii, conditii_plata,
          created_by, created_at, updated_at)
     VALUES
-        ($1,$2,$3, $4::tip_document, $5::stare_factura,
-         $6,$7,$8,
-         $9,$10,$11,$12,
-         $13::numeric, $14::numeric, $15::numeric,
-         $16::numeric, $17::numeric,
-         $18,$19,$20,
-         $21,$22,$23)
+        ($1,$2,$3, $4::tip_document, $5::tip_tranzactie, $6::stare_factura,
+         $7,$8,$9,
+         $10,$11,$12,$13,
+         $14::numeric, $15::numeric, $16::numeric,
+         $17::numeric, $18::numeric,
+         $19,$20,$21,
+         $22,$23,$24)
     RETURNING
         id,
         numar              AS number,
         serie              AS series,
         tip_document::text AS document_type,
+        tip_tranzactie::text AS transaction_type,
         stare::text        AS status,
         data_emitere       AS issued_date,
         data_scadenta      AS due_date,
@@ -113,7 +120,9 @@ const CREATE_INVOICE: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const INSERT_LINE: &str = "
@@ -143,18 +152,20 @@ const UPDATE_HEADER: &str = "
     UPDATE factura
     SET numar = $1, serie = $2,
         tip_document = $3::tip_document,
-        data_emitere = $4, data_scadenta = $5, data_livrare = $6,
-        emitent_pf_id = $7, emitent_pj_id = $8, partener_id = $9,
-        moneda = $10,
-        factura_referinta_id = $11,
-        observatii = $12, conditii_plata = $13,
-        updated_at = $14
-    WHERE id = $15 AND created_by = $16
+        tip_tranzactie = $4::tip_tranzactie,
+        data_emitere = $5, data_scadenta = $6, data_livrare = $7,
+        emitent_pf_id = $8, emitent_pj_id = $9, partener_id = $10,
+        moneda = $11,
+        factura_referinta_id = $12,
+        observatii = $13, conditii_plata = $14,
+        updated_at = $15
+    WHERE id = $16 AND created_by = $17
     RETURNING
         id,
         numar              AS number,
         serie              AS series,
         tip_document::text AS document_type,
+        tip_tranzactie::text AS transaction_type,
         stare::text        AS status,
         data_emitere       AS issued_date,
         data_scadenta      AS due_date,
@@ -171,7 +182,9 @@ const UPDATE_HEADER: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const UPDATE_STATUS: &str = "
@@ -183,6 +196,7 @@ const UPDATE_STATUS: &str = "
         numar              AS number,
         serie              AS series,
         tip_document::text AS document_type,
+        tip_tranzactie::text AS transaction_type,
         stare::text        AS status,
         data_emitere       AS issued_date,
         data_scadenta      AS due_date,
@@ -199,13 +213,50 @@ const UPDATE_STATUS: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
+        tx_hash, block_number, anchored_at
+";
+
+// When marking as Paid, automatically set suma_platita = total and rest_de_plata = 0.
+const UPDATE_STATUS_TO_PAID: &str = "
+    UPDATE factura
+    SET stare         = 'Platita'::stare_factura,
+        suma_platita  = total_cu_tva,
+        rest_de_plata = 0,
+        updated_at    = $1
+    WHERE id = $2 AND created_by = $3
+    RETURNING
+        id,
+        numar              AS number,
+        serie              AS series,
+        tip_document::text AS document_type,
+        tip_tranzactie::text AS transaction_type,
+        stare::text        AS status,
+        data_emitere       AS issued_date,
+        data_scadenta      AS due_date,
+        data_livrare       AS delivery_date,
+        emitent_pf_id      AS issuer_pf_id,
+        emitent_pj_id      AS issuer_pj_id,
+        partener_id        AS partner_id,
+        moneda             AS currency,
+        total_fara_tva::text  AS subtotal,
+        total_tva::text       AS total_vat,
+        total_cu_tva::text    AS total,
+        suma_platita::text    AS amount_paid,
+        rest_de_plata::text   AS amount_due,
+        factura_referinta_id  AS reference_invoice_id,
+        observatii            AS notes,
+        conditii_plata        AS payment_terms,
+        created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const UPDATE_PAYMENT: &str = "
     UPDATE factura
-    SET suma_platita  = $1::numeric,
-        rest_de_plata = total_cu_tva - $1::numeric,
+    SET suma_platita  = suma_platita + $1::numeric,
+        rest_de_plata = total_cu_tva - (suma_platita + $1::numeric),
         updated_at    = $2
     WHERE id = $3 AND created_by = $4
     RETURNING
@@ -213,6 +264,7 @@ const UPDATE_PAYMENT: &str = "
         numar              AS number,
         serie              AS series,
         tip_document::text AS document_type,
+        tip_tranzactie::text AS transaction_type,
         stare::text        AS status,
         data_emitere       AS issued_date,
         data_scadenta      AS due_date,
@@ -229,15 +281,17 @@ const UPDATE_PAYMENT: &str = "
         factura_referinta_id  AS reference_invoice_id,
         observatii            AS notes,
         conditii_plata        AS payment_terms,
-        created_by, created_at, updated_at
+        created_by, created_at, updated_at,
+        sent_tx_hash, sent_block_number, sent_anchored_at,
+        tx_hash, block_number, anchored_at
 ";
 
 const DELETE_LINES: &str = "DELETE FROM factura_linie WHERE factura_id = $1";
 const DELETE_INVOICE: &str =
-    "DELETE FROM factura WHERE id = $1 AND created_by = $2 AND stare = 'Draft'::stare_factura";
+    "DELETE FROM factura WHERE id = $1 AND created_by = $2 AND stare IN ('Draft'::stare_factura, 'Platita'::stare_factura)";
 
 // ============================================================================
-// ROW TYPES — NUMERIC columns as String
+// ROW TYPES
 // ============================================================================
 
 #[derive(sqlx::FromRow)]
@@ -246,6 +300,7 @@ struct InvoiceRow {
     number: String,
     series: Option<String>,
     document_type: String,
+    transaction_type: Option<String>,
     status: String,
     issued_date: chrono::NaiveDate,
     due_date: Option<chrono::NaiveDate>,
@@ -265,6 +320,12 @@ struct InvoiceRow {
     created_by: Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
+    sent_tx_hash: Option<String>,
+    sent_block_number: Option<i64>,
+    sent_anchored_at: Option<chrono::DateTime<chrono::Utc>>,
+    tx_hash: Option<String>,
+    block_number: Option<i64>,
+    anchored_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -308,6 +369,12 @@ fn row_to_invoice(row: InvoiceRow) -> Result<Invoice, sqlx::Error> {
         "AvizDeExpeditie" => DocumentType::DeliveryNote,
         other => return Err(decode_err(format!("Unknown document_type: {other}"))),
     };
+    let transaction_type = match row.transaction_type.as_deref() {
+        Some("Venit") => Some(TransactionType::Income),
+        Some("Cheltuiala") => Some(TransactionType::Expense),
+        None => None,
+        Some(other) => return Err(decode_err(format!("Unknown transaction_type: {other}"))),
+    };
     let status = match row.status.as_str() {
         "Draft" => InvoiceStatus::Draft,
         "Emisa" => InvoiceStatus::Issued,
@@ -321,6 +388,7 @@ fn row_to_invoice(row: InvoiceRow) -> Result<Invoice, sqlx::Error> {
         number: row.number,
         series: row.series,
         document_type,
+        transaction_type,
         status,
         issued_date: row.issued_date,
         due_date: row.due_date,
@@ -340,6 +408,12 @@ fn row_to_invoice(row: InvoiceRow) -> Result<Invoice, sqlx::Error> {
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: row.updated_at,
+        sent_tx_hash: row.sent_tx_hash,
+        sent_block_number: row.sent_block_number,
+        sent_anchored_at: row.sent_anchored_at,
+        tx_hash: row.tx_hash,
+        block_number: row.block_number,
+        anchored_at: row.anchored_at,
     })
 }
 
@@ -399,13 +473,26 @@ fn vat_rate_to_db(v: VatRate) -> &'static str {
     }
 }
 
+fn transaction_type_to_db(t: TransactionType) -> &'static str {
+    match t {
+        TransactionType::Income => "Venit",
+        TransactionType::Expense => "Cheltuiala",
+    }
+}
+
 // ============================================================================
 // REPOSITORY TRAIT
 // ============================================================================
 
 #[async_trait]
 pub trait InvoiceRepository: Send + Sync {
-    async fn find_all_for_user(&self, user_id: Uuid) -> Result<Vec<Invoice>, sqlx::Error>;
+    /// Entity-scoped list. `entity_type` is "PF" or "PJ"; `entity_id` is the PF/PJ UUID.
+    async fn find_all_for_entity(
+        &self,
+        user_id: Uuid,
+        entity_type: &str,
+        entity_id: Uuid,
+    ) -> Result<Vec<Invoice>, sqlx::Error>;
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Invoice>, sqlx::Error>;
     async fn find_lines(&self, invoice_id: Uuid) -> Result<Vec<InvoiceLine>, sqlx::Error>;
     async fn create(
@@ -433,6 +520,40 @@ pub trait InvoiceRepository: Send + Sync {
         user_id: Uuid,
     ) -> Result<Option<Invoice>, sqlx::Error>;
     async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<bool, sqlx::Error>;
+
+    /// Returns the next suggested invoice number for a given series + user.
+    ///
+    /// Scans `factura` for the highest existing number matching the pattern
+    /// `{SERIES}-{YEAR}-{NNN}` for this user's entity, then increments.
+    /// If no invoices exist yet for this series, returns `{SERIES}-{YEAR}-001`.
+    async fn get_next_number_for_series(
+        &self,
+        user_id: Uuid,
+        series: &str,
+    ) -> Result<String, sqlx::Error>;
+
+    /// Stores the Sent-transition blockchain anchor on an invoice.
+    async fn update_sent_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error>;
+
+    /// Stores the Paid-transition blockchain anchor on an invoice.
+    async fn update_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error>;
+
+    /// Returns `(issuer_display, partner_display)` for building a human-readable
+    /// blockchain memo. Issuer is "Prenume Nume" for PF or "Denumire" for PJ.
+    async fn get_anchor_parties(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<(String, String)>, sqlx::Error>;
 }
 
 pub type DynInvoiceRepository = Arc<dyn InvoiceRepository>;
@@ -492,14 +613,25 @@ impl PgInvoiceRepository {
 
 #[async_trait]
 impl InvoiceRepository for PgInvoiceRepository {
-    async fn find_all_for_user(&self, user_id: Uuid) -> Result<Vec<Invoice>, sqlx::Error> {
-        let rows = sqlx::query_as::<_, InvoiceRow>(&format!(
-            "{SELECT_INVOICE} WHERE created_by = $1 ORDER BY issued_date DESC"
-        ))
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
+    async fn find_all_for_entity(
+        &self,
+        user_id: Uuid,
+        entity_type: &str,
+        entity_id: Uuid,
+    ) -> Result<Vec<Invoice>, sqlx::Error> {
+        let sql = match entity_type {
+            "PF" => format!(
+                "{SELECT_INVOICE} WHERE created_by = $1 AND emitent_pf_id = $2 ORDER BY data_emitere DESC"
+            ),
+            _ => format!(
+                "{SELECT_INVOICE} WHERE created_by = $1 AND emitent_pj_id = $2 ORDER BY data_emitere DESC"
+            ),
+        };
+        let rows = sqlx::query_as::<_, InvoiceRow>(&sql)
+            .bind(user_id)
+            .bind(entity_id)
+            .fetch_all(&self.pool)
+            .await?;
         rows.into_iter().map(row_to_invoice).collect()
     }
 
@@ -523,6 +655,47 @@ impl InvoiceRepository for PgInvoiceRepository {
         rows.into_iter().map(row_to_line).collect()
     }
 
+    async fn get_next_number_for_series(
+        &self,
+        user_id: Uuid,
+        series: &str,
+    ) -> Result<String, sqlx::Error> {
+        let current_year = Utc::now().format("%Y").to_string();
+
+        // Find the highest number for this user + series + current year.
+        // Numbers follow the pattern: {SERIES}-{YEAR}-{NNN}
+        // We match on prefix and extract the integer suffix.
+        let prefix = format!("{series}-{current_year}-");
+
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT numar FROM factura
+             WHERE created_by = $1
+               AND serie = $2
+               AND numar LIKE $3
+             ORDER BY numar DESC
+             LIMIT 1",
+        )
+        .bind(user_id)
+        .bind(series)
+        .bind(format!("{prefix}%"))
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let next_seq: u32 = match row {
+            Some((last_number,)) => {
+                // Parse the integer suffix after the prefix
+                last_number
+                    .strip_prefix(&prefix)
+                    .and_then(|suffix| suffix.parse::<u32>().ok())
+                    .map(|n| n + 1)
+                    .unwrap_or(1)
+            }
+            None => 1,
+        };
+
+        Ok(format!("{series}-{current_year}-{next_seq:03}"))
+    }
+
     async fn create(
         &self,
         invoice: Invoice,
@@ -535,6 +708,7 @@ impl InvoiceRepository for PgInvoiceRepository {
             .bind(&invoice.number)
             .bind(&invoice.series)
             .bind(document_type_to_db(invoice.document_type))
+            .bind(invoice.transaction_type.map(transaction_type_to_db))
             .bind(status_to_db(invoice.status))
             .bind(invoice.issued_date)
             .bind(invoice.due_date)
@@ -543,11 +717,11 @@ impl InvoiceRepository for PgInvoiceRepository {
             .bind(invoice.issuer_pj_id)
             .bind(invoice.partner_id)
             .bind(&invoice.currency)
-            .bind("0") // total_fara_tva
-            .bind("0") // total_tva
-            .bind("0") // total_cu_tva
-            .bind("0") // suma_platita
-            .bind("0") // rest_de_plata
+            .bind("0")
+            .bind("0")
+            .bind("0")
+            .bind("0")
+            .bind("0")
             .bind(invoice.reference_invoice_id)
             .bind(&invoice.notes)
             .bind(&invoice.payment_terms)
@@ -559,12 +733,12 @@ impl InvoiceRepository for PgInvoiceRepository {
 
         let (subtotal, total_vat, total) = self.insert_lines(&mut tx, invoice.id, lines).await?;
 
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         sqlx::query(UPDATE_TOTALS)
             .bind(subtotal.to_string())
             .bind(total_vat.to_string())
             .bind(total.to_string())
-            .bind(total.to_string()) // amount_due = total when nothing paid yet
+            .bind(total.to_string())
             .bind(now)
             .bind(invoice.id)
             .execute(&mut *tx)
@@ -598,6 +772,7 @@ impl InvoiceRepository for PgInvoiceRepository {
             .bind(&invoice.number)
             .bind(&invoice.series)
             .bind(document_type_to_db(invoice.document_type))
+            .bind(invoice.transaction_type.map(transaction_type_to_db))
             .bind(invoice.issued_date)
             .bind(invoice.due_date)
             .bind(invoice.delivery_date)
@@ -628,7 +803,7 @@ impl InvoiceRepository for PgInvoiceRepository {
 
         let (subtotal, total_vat, total) = self.insert_lines(&mut tx, id, lines).await?;
 
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         sqlx::query(UPDATE_TOTALS)
             .bind(subtotal.to_string())
             .bind(total_vat.to_string())
@@ -660,14 +835,23 @@ impl InvoiceRepository for PgInvoiceRepository {
         status: InvoiceStatus,
         user_id: Uuid,
     ) -> Result<Option<Invoice>, sqlx::Error> {
-        let now = chrono::Utc::now();
-        let row = sqlx::query_as::<_, InvoiceRow>(UPDATE_STATUS)
-            .bind(status_to_db(status))
-            .bind(now)
-            .bind(id)
-            .bind(user_id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let now = Utc::now();
+        let row = if status == InvoiceStatus::Paid {
+            sqlx::query_as::<_, InvoiceRow>(UPDATE_STATUS_TO_PAID)
+                .bind(now)
+                .bind(id)
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await?
+        } else {
+            sqlx::query_as::<_, InvoiceRow>(UPDATE_STATUS)
+                .bind(status_to_db(status))
+                .bind(now)
+                .bind(id)
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await?
+        };
 
         row.map(row_to_invoice).transpose()
     }
@@ -678,7 +862,7 @@ impl InvoiceRepository for PgInvoiceRepository {
         amount: Decimal,
         user_id: Uuid,
     ) -> Result<Option<Invoice>, sqlx::Error> {
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         let row = sqlx::query_as::<_, InvoiceRow>(UPDATE_PAYMENT)
             .bind(amount.to_string())
             .bind(now)
@@ -698,5 +882,126 @@ impl InvoiceRepository for PgInvoiceRepository {
             .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    async fn update_sent_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error> {
+        let row = sqlx::query_as::<_, InvoiceRow>(
+            "UPDATE factura
+             SET sent_tx_hash = $1, sent_block_number = $2, sent_anchored_at = NOW()
+             WHERE id = $3
+             RETURNING
+                 id,
+                 numar              AS number,
+                 serie              AS series,
+                 tip_document::text AS document_type,
+                 tip_tranzactie::text AS transaction_type,
+                 stare::text        AS status,
+                 data_emitere       AS issued_date,
+                 data_scadenta      AS due_date,
+                 data_livrare       AS delivery_date,
+                 emitent_pf_id      AS issuer_pf_id,
+                 emitent_pj_id      AS issuer_pj_id,
+                 partener_id        AS partner_id,
+                 moneda             AS currency,
+                 total_fara_tva::text  AS subtotal,
+                 total_tva::text       AS total_vat,
+                 total_cu_tva::text    AS total,
+                 suma_platita::text    AS amount_paid,
+                 rest_de_plata::text   AS amount_due,
+                 factura_referinta_id  AS reference_invoice_id,
+                 observatii            AS notes,
+                 conditii_plata        AS payment_terms,
+                 created_by, created_at, updated_at,
+                 sent_tx_hash, sent_block_number, sent_anchored_at,
+                 tx_hash, block_number, anchored_at",
+        )
+        .bind(tx_hash)
+        .bind(block_number)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(row_to_invoice).transpose()
+    }
+
+    async fn update_anchor_info(
+        &self,
+        id: Uuid,
+        tx_hash: &str,
+        block_number: i64,
+    ) -> Result<Option<Invoice>, sqlx::Error> {
+        let row = sqlx::query_as::<_, InvoiceRow>(
+            "UPDATE factura
+             SET tx_hash = $1, block_number = $2, anchored_at = NOW()
+             WHERE id = $3
+             RETURNING
+                 id,
+                 numar              AS number,
+                 serie              AS series,
+                 tip_document::text AS document_type,
+                 tip_tranzactie::text AS transaction_type,
+                 stare::text        AS status,
+                 data_emitere       AS issued_date,
+                 data_scadenta      AS due_date,
+                 data_livrare       AS delivery_date,
+                 emitent_pf_id      AS issuer_pf_id,
+                 emitent_pj_id      AS issuer_pj_id,
+                 partener_id        AS partner_id,
+                 moneda             AS currency,
+                 total_fara_tva::text  AS subtotal,
+                 total_tva::text       AS total_vat,
+                 total_cu_tva::text    AS total,
+                 suma_platita::text    AS amount_paid,
+                 rest_de_plata::text   AS amount_due,
+                 factura_referinta_id  AS reference_invoice_id,
+                 observatii            AS notes,
+                 conditii_plata        AS payment_terms,
+                 created_by, created_at, updated_at,
+                 sent_tx_hash, sent_block_number, sent_anchored_at,
+                 tx_hash, block_number, anchored_at",
+        )
+        .bind(tx_hash)
+        .bind(block_number)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(row_to_invoice).transpose()
+    }
+
+    async fn get_anchor_parties(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<(String, String)>, sqlx::Error> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            issuer: String,
+            partner: String,
+        }
+
+        let row = sqlx::query_as::<_, Row>(
+            "SELECT
+                COALESCE(
+                    pf.prenume || ' ' || pf.nume,
+                    pj.denumire,
+                    'Necunoscut'
+                ) AS issuer,
+                COALESCE(p.denumire, 'Necunoscut') AS partner
+             FROM factura f
+             LEFT JOIN persoana_fizica   pf ON f.emitent_pf_id = pf.id
+             LEFT JOIN persoana_juridica pj ON f.emitent_pj_id = pj.id
+             LEFT JOIN partener          p  ON f.partener_id   = p.id
+             WHERE f.id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| (r.issuer, r.partner)))
     }
 }

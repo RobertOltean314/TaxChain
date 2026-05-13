@@ -1,3 +1,9 @@
+pub mod audit_service;
+pub mod bnr_service;
+pub mod proof_service;
+pub mod report_service;
+pub mod e_factura_service;
+pub mod entity_service;
 pub mod invoice_service;
 pub mod partner_service;
 pub mod persoana_fizica_service;

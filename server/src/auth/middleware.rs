@@ -38,7 +38,7 @@ impl AuthenticatedUser {
 /// On failure: short-circuits with 401 Unauthorized.
 ///
 /// # Usage in main.rs
-/// ```rust
+/// ```rust,ignore
 /// web::scope("/persoana-fizica")
 ///     .wrap(JwtAuthMiddleware)
 ///     .service(find_all_persoana_fizica)

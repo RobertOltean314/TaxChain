@@ -17,14 +17,18 @@ pub fn validate_cod_postal(cod: &str) -> Result<(), ValidationError> {
 }
 
 /// Validates IBAN format with basic structure check.
+/// Strips spaces and uppercases before checking — users commonly type IBANs with spaces.
 /// Full mod-97 validation included.
 pub fn validate_iban(iban: &str) -> Result<(), ValidationError> {
-    if !IBAN_REGEX.is_match(iban) {
+    let clean: String = iban.chars().filter(|c| !c.is_whitespace()).collect();
+    let clean = clean.to_uppercase();
+
+    if !IBAN_REGEX.is_match(&clean) {
         return Err(ValidationError::new("iban_invalid_format"));
     }
 
     // IBAN mod-97 checksum validation
-    let rearranged = format!("{}{}", &iban[4..], &iban[..4]);
+    let rearranged = format!("{}{}", &clean[4..], &clean[..4]);
 
     let numeric_string: String = rearranged
         .chars()

@@ -1,11 +1,16 @@
+pub mod audit_model;
 pub mod auth_models;
+pub mod efactura_model;
+pub mod entity_model;
 pub mod invoice_model;
 pub mod partner_model;
 pub mod persoana_fizica_model;
 pub mod persoana_juridica_model;
+pub mod proof_model;
 pub mod user_model;
 
 pub use auth_models::*;
+pub use entity_model::*;
 pub use invoice_model::*;
 pub use partner_model::*;
 pub use persoana_fizica_model::*;

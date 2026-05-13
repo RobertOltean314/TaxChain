@@ -79,6 +79,6 @@ pub fn mock_persoana_fizica_request() -> PersoanaFizicaRequest {
         telefon: Some("+40740111222".to_string()),
         email: Some("ion.popescu@example.com".to_string()),
         stare: Some(StarePersoanaFizica::Activ),
-        wallet: "erd1qyu5wthldmockwalletaddress0001".to_string(),
+        wallet: Some("erd1qyu5wthldmockwalletaddress0001".to_string()),
     }
 }

@@ -1,13 +1,47 @@
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, patch, post, put, web};
+use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
 use crate::auth::middleware::{AuthenticatedUser, require_role};
+use crate::blockchain::anchor::DynAnchorService;
 use crate::models::{
     Invoice, InvoicePaymentRequest, InvoiceRequest, InvoiceStatus, InvoiceStatusRequest, UserRole,
 };
-use crate::services::invoice_service::DynInvoiceRepository;
+use crate::models::audit_model::CreateAuditEntry;
+use crate::models::entity_model::EntityContext;
+use crate::services::{
+    audit_service::DynAuditRepository,
+    invoice_service::DynInvoiceRepository,
+    user_service::DynUserRepository,
+};
+
+/// Extract `X-Entity-Type` and `X-Entity-Id` headers. Returns 400 if missing/invalid.
+fn extract_entity(req: &HttpRequest) -> Result<EntityContext, HttpResponse> {
+    let entity_type = req
+        .headers()
+        .get("X-Entity-Type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_uppercase())
+        .filter(|s| s == "PF" || s == "PJ")
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Type header (must be PF or PJ)"}))
+        })?;
+
+    let entity_id = req
+        .headers()
+        .get("X-Entity-Id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            HttpResponse::BadRequest()
+                .json(json!({"error": "Missing or invalid X-Entity-Id header (must be a UUID)"}))
+        })?;
+
+    Ok(EntityContext { entity_type, entity_id })
+}
 
 // ============================================================================
 // HELPER — extract authenticated user + user_id in one call
@@ -25,10 +59,68 @@ fn authenticated(
 }
 
 // ============================================================================
+// QUERY PARAMS
+// ============================================================================
+
+#[derive(Deserialize)]
+pub struct NextNumberQuery {
+    pub series: String,
+}
+
+// ============================================================================
 // HANDLERS
 // ============================================================================
 
-/// `GET /invoice` — list all invoices owned by the authenticated user.
+/// `GET /factura/next-number?series=FC`
+///
+/// Suggests the next invoice number for the given series, scoped to the
+/// authenticated user's issuer entity.
+///
+/// Logic: find MAX(numar) in factura for this series + this user's entity,
+/// parse the integer suffix, increment by 1, return the suggestion.
+/// The user is free to override — this is advisory only.
+///
+/// Response: `{ "series": "FC", "next_number": "FC-2025-007" }`
+///
+/// NOTE: This handler must be registered BEFORE `/{id}` in the scope,
+/// otherwise Actix will try to parse "next-number" as a UUID and return 400.
+#[get("/next-number")]
+pub async fn get_next_invoice_number(
+    req: HttpRequest,
+    repo: web::Data<DynInvoiceRepository>,
+    query: web::Query<NextNumberQuery>,
+) -> impl Responder {
+    let (_, user_id) = match authenticated(
+        &req,
+        &[UserRole::Admin, UserRole::Taxpayer],
+    ) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+
+    let series = query.series.trim().to_uppercase();
+
+    if series.is_empty() {
+        return HttpResponse::UnprocessableEntity()
+            .json(json!({ "error": "series query parameter cannot be empty" }));
+    }
+
+    match repo.get_next_number_for_series(user_id, &series).await {
+        Ok(next_number) => HttpResponse::Ok().json(json!({
+            "series": series,
+            "next_number": next_number
+        })),
+        Err(e) => {
+            eprintln!("get_next_invoice_number error: {e}");
+            HttpResponse::InternalServerError().json(json!({
+                "error": "Failed to compute next invoice number",
+                "details": e.to_string()
+            }))
+        }
+    }
+}
+
+/// `GET /factura` — list all invoices owned by the authenticated user.
 #[get("")]
 pub async fn find_all_invoices(
     req: HttpRequest,
@@ -36,13 +128,18 @@ pub async fn find_all_invoices(
 ) -> impl Responder {
     let (_, user_id) = match authenticated(
         &req,
-        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+        &[UserRole::Admin, UserRole::Taxpayer],
     ) {
         Ok(v) => v,
         Err(r) => return r,
     };
 
-    match repo.find_all_for_user(user_id).await {
+    let ctx = match extract_entity(&req) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+
+    match repo.find_all_for_entity(user_id, &ctx.entity_type, ctx.entity_id).await {
         Ok(list) => HttpResponse::Ok().json(list),
         Err(e) => {
             eprintln!("find_all_invoices error: {e}");
@@ -54,7 +151,7 @@ pub async fn find_all_invoices(
     }
 }
 
-/// `GET /invoice/:id` — full invoice with lines.
+/// `GET /factura/:id` — full invoice with lines.
 #[get("/{id}")]
 pub async fn get_invoice_by_id(
     req: HttpRequest,
@@ -63,7 +160,7 @@ pub async fn get_invoice_by_id(
 ) -> impl Responder {
     let (user, user_id) = match authenticated(
         &req,
-        &[UserRole::Admin, UserRole::Auditor, UserRole::Taxpayer],
+        &[UserRole::Admin, UserRole::Taxpayer],
     ) {
         Ok(v) => v,
         Err(r) => return r,
@@ -86,7 +183,6 @@ pub async fn get_invoice_by_id(
         }
     };
 
-    // Taxpayers may only view their own invoices
     if user.claims().role == UserRole::Taxpayer && invoice.created_by != user_id {
         return HttpResponse::Forbidden()
             .json(json!({ "error": "Access denied — you can only view your own invoices" }));
@@ -106,14 +202,16 @@ pub async fn get_invoice_by_id(
     HttpResponse::Ok().json(json!({ "invoice": invoice, "lines": lines }))
 }
 
-/// `POST /invoice` — create a new invoice with lines (Admin or Taxpayer).
+/// `POST /factura` — create a new invoice with lines (Admin or Taxpayer).
 #[post("")]
 pub async fn create_invoice(
     req: HttpRequest,
     repo: web::Data<DynInvoiceRepository>,
-    body: web::Json<InvoiceRequest>,
+    user_repo: web::Data<DynUserRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
+    mut body: web::Json<InvoiceRequest>,
 ) -> impl Responder {
-    let (_, user_id) = match authenticated(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
+    let (user, user_id) = match authenticated(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -125,10 +223,36 @@ pub async fn create_invoice(
         }));
     }
 
+    // Auto-set issuer if not provided
     if body.issuer_pf_id.is_none() && body.issuer_pj_id.is_none() {
-        return HttpResponse::UnprocessableEntity().json(json!({
-            "error": "At least one issuer (issuer_pf_id or issuer_pj_id) is required"
-        }));
+        if user.claims().role == UserRole::Taxpayer {
+            let mut issuer_pf = user.claims().persoana_fizica_id;
+            let mut issuer_pj = user.claims().persoana_juridica_id;
+
+            if issuer_pf.is_none() && issuer_pj.is_none() {
+                if let Ok(user_id) = Uuid::parse_str(&user.claims().sub) {
+                    if let Ok(Some(stored_user)) = user_repo.find_by_id(user_id).await {
+                        issuer_pf = stored_user.persoana_fizica_id;
+                        issuer_pj = stored_user.persoana_juridica_id;
+                    }
+                }
+            }
+
+            if let Some(pf_id) = issuer_pf {
+                body.issuer_pf_id = Some(pf_id);
+            } else if let Some(pj_id) = issuer_pj {
+                body.issuer_pj_id = Some(pj_id);
+            } else {
+                return HttpResponse::UnprocessableEntity().json(json!({
+                    "error": "No issuer entity found. Please create a PersoanaFizica or PersoanaJuridica profile first."
+                }));
+            }
+        } else {
+            // Admins must explicitly specify an issuer
+            return HttpResponse::UnprocessableEntity().json(json!({
+                "error": "At least one issuer (issuer_pf_id or issuer_pj_id) is required"
+            }));
+        }
     }
 
     if body.lines.is_empty() {
@@ -136,11 +260,32 @@ pub async fn create_invoice(
             .json(json!({ "error": "An invoice must contain at least one line item" }));
     }
 
+    let ctx = extract_entity(&req).ok();
     let invoice = Invoice::from_request(&body, user_id);
     let lines = body.into_inner().lines;
 
     match repo.create(invoice, lines).await {
-        Ok(created) => HttpResponse::Created().json(created),
+        Ok(created) => {
+            let audit = audit_repo.clone();
+            let number = created.invoice.number.clone();
+            let total = created.invoice.total.to_string();
+            let currency = created.invoice.currency.clone();
+            let invoice_id = created.invoice.id;
+            let entity_type = ctx.as_ref().map(|c| c.entity_type.clone());
+            let entity_id = ctx.as_ref().map(|c| c.entity_id);
+            tokio::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "invoice.created",
+                    actor_user_id: user_id,
+                    entity_type,
+                    entity_id,
+                    resource_type: "invoice",
+                    resource_id: Some(invoice_id),
+                    payload: serde_json::json!({ "number": number, "total": total, "currency": currency }),
+                }).await;
+            });
+            HttpResponse::Created().json(created)
+        }
         Err(e) => {
             eprintln!("create_invoice error: {e}");
             HttpResponse::InternalServerError().json(json!({
@@ -151,7 +296,7 @@ pub async fn create_invoice(
     }
 }
 
-/// `PUT /invoice/:id` — replace header + lines (Draft only, Admin or Taxpayer own).
+/// `PUT /factura/:id` — replace header + lines (Draft only, Admin or Taxpayer own).
 #[put("/{id}")]
 pub async fn update_invoice(
     req: HttpRequest,
@@ -222,16 +367,19 @@ pub async fn update_invoice(
     }
 }
 
-/// `PATCH /invoice/:id/status` — advance the invoice lifecycle.
+/// `PATCH /factura/:id/status` — advance the invoice lifecycle.
 ///
-/// Role matrix:
-///   Draft → Issued, Issued → Sent, Sent → Paid : Admin + Taxpayer (own only)
-///   Any → Cancelled                            : Admin + Taxpayer (own only)
-///   Auditor                                    : read-only, cannot change status
+/// When transitioning to `Paid`, automatically anchors the invoice hash on
+/// Sepolia using the user's custodial wallet key (or PLATFORM_SIGNER_KEY for
+/// SIWE users). Anchoring is best-effort — the status update is committed
+/// regardless; a failed anchor leaves tx_hash as NULL.
 #[patch("/{id}/status")]
 pub async fn update_invoice_status(
     req: HttpRequest,
     repo: web::Data<DynInvoiceRepository>,
+    anchor_service: web::Data<DynAnchorService>,
+    user_repo: web::Data<DynUserRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
     path: web::Path<Uuid>,
     body: web::Json<InvoiceStatusRequest>,
 ) -> impl Responder {
@@ -271,22 +419,125 @@ pub async fn update_invoice_status(
         }));
     }
 
-    match repo.update_status(id, body.status, user_id).await {
-        Ok(Some(inv)) => HttpResponse::Ok().json(inv),
+    // ── On-chain anchoring for Sent / Paid: attempt BEFORE committing status ──
+    // If we have a signing key and the chain call fails, we return an error and
+    // leave the invoice in its current status so the user can retry.
+    let anchor_ok: Option<(String, i64)> =
+        if body.status == InvoiceStatus::Sent || body.status == InvoiceStatus::Paid {
+            let private_key = match user_repo.find_by_id(user_id).await {
+                Ok(Some(u)) => match u.assigned_wallet_key_enc.as_deref() {
+                    Some(enc) => crate::wallet::encryption::decrypt_private_key(enc, None).ok(),
+                    None => std::env::var("PLATFORM_SIGNER_KEY").ok().filter(|k| !k.is_empty()),
+                },
+                _ => None,
+            };
+
+            if let Some(key) = private_key {
+                let lines = repo.find_lines(id).await.unwrap_or_default();
+                let transition = if body.status == InvoiceStatus::Sent { "sent" } else { "paid" };
+                let hash = crate::blockchain::anchor::AnchorService::compute_invoice_hash(&existing, &lines, transition);
+                let (issuer, partner) = repo
+                    .get_anchor_parties(id).await
+                    .unwrap_or(None)
+                    .unwrap_or_else(|| ("Necunoscut".into(), "Necunoscut".into()));
+                let memo = format!(
+                    "TaxChain | {} | {} | {} → {} | {}",
+                    existing.number,
+                    if body.status == InvoiceStatus::Sent { "Trimisa" } else { "Platita" },
+                    issuer,
+                    partner,
+                    chrono::Utc::now().format("%Y-%m-%d")
+                );
+
+                match anchor_service.anchor_invoice(hash, &key, memo).await {
+                    Ok(result) => Some(result),
+                    Err(e) => {
+                        return HttpResponse::BadGateway().json(json!({
+                            "error": "Blockchain anchor failed — invoice status not changed. Check your wallet balance and retry.",
+                            "details": e.to_string()
+                        }));
+                    }
+                }
+            } else {
+                eprintln!("anchor invoice: no private key for user {user_id}, proceeding without anchor");
+                None
+            }
+        } else {
+            None
+        };
+
+    // ── Commit status to DB ──────────────────────────────────────────────────
+    let invoice = match repo.update_status(id, body.status, user_id).await {
+        Ok(Some(inv)) => inv,
         Ok(None) => {
-            HttpResponse::NotFound().json(json!({ "error": format!("Invoice {} not found", id) }))
+            return HttpResponse::NotFound()
+                .json(json!({ "error": format!("Invoice {} not found", id) }));
         }
         Err(e) => {
             eprintln!("update_invoice_status error: {e}");
-            HttpResponse::InternalServerError().json(json!({
+            return HttpResponse::InternalServerError().json(json!({
                 "error": "Failed to update invoice status",
                 "details": e.to_string()
-            }))
+            }));
+        }
+    };
+
+    // ── Store anchor result (chain call already succeeded above) ─────────────
+    if let Some((tx_hash, block_number)) = anchor_ok {
+        let db_result = if body.status == InvoiceStatus::Sent {
+            repo.update_sent_anchor_info(id, &tx_hash, block_number).await
+        } else {
+            repo.update_anchor_info(id, &tx_hash, block_number).await
+        };
+        match db_result {
+            Ok(Some(anchored)) => {
+                fire_status_audit(&audit_repo, user_id, &existing, body.status, id, &anchored);
+                return HttpResponse::Ok().json(anchored);
+            }
+            Ok(None) => eprintln!("anchor invoice: update_anchor_info returned None"),
+            Err(e) => eprintln!("anchor invoice: DB write failed after tx={tx_hash}: {e}"),
         }
     }
+
+    // Audit: fire-and-forget
+    fire_status_audit(&audit_repo, user_id, &existing, body.status, id, &invoice);
+
+    HttpResponse::Ok().json(invoice)
 }
 
-/// `PATCH /invoice/:id/payment` — record a cumulative payment amount.
+fn fire_status_audit(
+    audit_repo: &crate::services::audit_service::DynAuditRepository,
+    user_id: Uuid,
+    existing: &Invoice,
+    next_status: InvoiceStatus,
+    invoice_id: Uuid,
+    invoice: &Invoice,
+) {
+    let audit = audit_repo.clone();
+    let from_status = format!("{:?}", existing.status);
+    let to_status = format!("{:?}", next_status);
+    let number = invoice.number.clone();
+    let entity_type = invoice.issuer_pf_id.map(|_| "PF".to_string())
+        .or_else(|| invoice.issuer_pj_id.map(|_| "PJ".to_string()));
+    let entity_id = invoice.issuer_pf_id.or(invoice.issuer_pj_id);
+    tokio::spawn(async move {
+        let _ = audit.log(CreateAuditEntry {
+            action: "invoice.status_changed",
+            actor_user_id: user_id,
+            entity_type,
+            entity_id,
+            resource_type: "invoice",
+            resource_id: Some(invoice_id),
+            payload: serde_json::json!({
+                "from": from_status,
+                "to": to_status,
+                "number": number,
+            }),
+        }).await;
+    });
+}
+
+/// `PATCH /factura/:id/payment` — record a cumulative payment amount.
 #[patch("/{id}/payment")]
 pub async fn update_invoice_payment(
     req: HttpRequest,
@@ -333,10 +584,10 @@ pub async fn update_invoice_payment(
             .json(json!({ "error": "Payment amount cannot be negative" }));
     }
 
-    if body.amount > existing.total {
+    if body.amount > existing.amount_due {
         return HttpResponse::UnprocessableEntity().json(json!({
-            "error": "Payment amount exceeds invoice total",
-            "invoice_total": existing.total.to_string(),
+            "error": "Payment amount exceeds remaining invoice balance",
+            "amount_due": existing.amount_due.to_string(),
             "requested": body.amount.to_string()
         }));
     }
@@ -356,11 +607,12 @@ pub async fn update_invoice_payment(
     }
 }
 
-/// `DELETE /invoice/:id` — only Draft invoices can be deleted.
+/// `DELETE /factura/:id` — only Draft invoices can be deleted.
 #[delete("/{id}")]
 pub async fn delete_invoice(
     req: HttpRequest,
     repo: web::Data<DynInvoiceRepository>,
+    audit_repo: web::Data<DynAuditRepository>,
     path: web::Path<Uuid>,
 ) -> impl Responder {
     let (user, user_id) = match authenticated(&req, &[UserRole::Admin, UserRole::Taxpayer]) {
@@ -389,15 +641,34 @@ pub async fn delete_invoice(
             .json(json!({ "error": "Access denied — you can only delete your own invoices" }));
     }
 
-    if existing.status != InvoiceStatus::Draft {
+    if existing.status != InvoiceStatus::Draft && existing.status != InvoiceStatus::Paid {
         return HttpResponse::Conflict().json(json!({
-            "error": "Only Draft invoices can be deleted",
+            "error": "Only Draft or Paid invoices can be deleted",
             "current_status": format!("{:?}", existing.status)
         }));
     }
 
     match repo.delete(id, user_id).await {
-        Ok(true) => HttpResponse::NoContent().finish(),
+        Ok(true) => {
+            let audit = audit_repo.clone();
+            let number = existing.number.clone();
+            let status = format!("{:?}", existing.status);
+            let entity_type = existing.issuer_pf_id.map(|_| "PF".to_string())
+                .or_else(|| existing.issuer_pj_id.map(|_| "PJ".to_string()));
+            let entity_id = existing.issuer_pf_id.or(existing.issuer_pj_id);
+            tokio::spawn(async move {
+                let _ = audit.log(CreateAuditEntry {
+                    action: "invoice.deleted",
+                    actor_user_id: user_id,
+                    entity_type,
+                    entity_id,
+                    resource_type: "invoice",
+                    resource_id: Some(id),
+                    payload: serde_json::json!({ "number": number, "status": status }),
+                }).await;
+            });
+            HttpResponse::NoContent().finish()
+        }
         Ok(false) => {
             HttpResponse::NotFound().json(json!({ "error": format!("Invoice {} not found", id) }))
         }

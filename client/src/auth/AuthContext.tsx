@@ -4,66 +4,77 @@ import {
   useEffect,
   useCallback,
   type ReactNode,
-} from 'react';
-import { authApi } from '../api/auth.api';
-import { setAccessToken } from '../api/axios';
-import type { UserResponse, AuthTokens } from '../types';
+} from "react";
+import { authApi } from "../api/auth.api";
+import type { UserResponse, AuthTokens } from "../types";
 
-interface AuthContextValue {
+interface Ctx {
   user: UserResponse | null;
   isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (tokens: AuthTokens) => void;
+  loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithWallet: (
+    address: string,
+    sign: (msg: string) => Promise<string>,
+  ) => Promise<void>;
   logout: () => Promise<void>;
+  applyTokens: (tokens: AuthTokens) => void;
 }
 
-export const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<Ctx>({} as Ctx);
+
+function store(tokens: AuthTokens, setUser: (u: UserResponse) => void) {
+  (window as any).__tc_token = tokens.access_token;
+  localStorage.setItem("tc_rt", tokens.refresh_token);
+  setUser(tokens.user);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setLoad] = useState(true);
 
-  // On mount: try to restore session from stored refresh token
+  // Restore session on mount
   useEffect(() => {
-    const restore = async () => {
-      const storedRefresh = localStorage.getItem('refresh_token');
-      if (!storedRefresh) {
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const tokens = await authApi.refresh(storedRefresh);
-        setAccessToken(tokens.access_token);
-        localStorage.setItem('refresh_token', tokens.refresh_token);
-        setUser(tokens.user);
-      } catch {
-        localStorage.removeItem('refresh_token');
-        setAccessToken(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    restore();
+    const rt = localStorage.getItem("tc_rt");
+    if (!rt) {
+      setLoad(false);
+      return;
+    }
+    authApi
+      .refresh(rt)
+      .then((t) => store(t, setUser))
+      .catch(() => localStorage.removeItem("tc_rt"))
+      .finally(() => setLoad(false));
   }, []);
 
-  const login = useCallback((tokens: AuthTokens) => {
-    setAccessToken(tokens.access_token);
-    localStorage.setItem('refresh_token', tokens.refresh_token);
-    setUser(tokens.user);
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    const t = await authApi.loginWithGoogle(idToken);
+    store(t, setUser);
   }, []);
+
+  const loginWithWallet = useCallback(
+    async (address: string, sign: (msg: string) => Promise<string>) => {
+      const nonce = await authApi.getWalletNonce(address);
+      const sig = await sign(nonce);
+      const t = await authApi.verifyWallet(address, sig);
+      store(t, setUser);
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
-    const storedRefresh = localStorage.getItem('refresh_token');
-    if (storedRefresh) {
+    const rt = localStorage.getItem("tc_rt");
+    if (rt) {
       try {
-        await authApi.logout(storedRefresh);
-      } catch {
-        // ignore — we clear locally regardless
-      }
+        await authApi.logout(rt);
+      } catch {}
     }
-    setAccessToken(null);
-    localStorage.removeItem('refresh_token');
+    (window as any).__tc_token = null;
+    localStorage.removeItem("tc_rt");
     setUser(null);
+  }, []);
+
+  const applyTokens = useCallback((tokens: AuthTokens) => {
+    store(tokens, setUser);
   }, []);
 
   return (
@@ -71,9 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isLoading,
-        isAuthenticated: !!user,
-        login,
+        loginWithGoogle,
+        loginWithWallet,
         logout,
+        applyTokens,
       }}
     >
       {children}

@@ -1,394 +1,466 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { persoanaJuridicaSchema, type PersoanaJuridicaFormValues } from '../validation/schemas';
-import { persoanaJuridicaApi } from '../api/persoanaJuridica.api';
-import { AppLayout } from '../components/ui/AppLayout';
-import { useToast } from '../components/ui/Toast';
-import { useAuth } from '../auth/useAuth';
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useForm, useFieldArray } from "react-hook-form";
+import { pjGetById, pjCreate, pjUpdate } from "../api/persoanaJuridica.api";
+import { useToast } from "../components/ui/Toast";
+import { AppLayout } from "../components/ui/AppLayout";
+import {
+  PageHeader,
+  FormField,
+  Input,
+  Select,
+  Button,
+} from "../components/ui/ui";
 
-function Field({
-  label,
-  error,
-  required,
-  children,
-}: {
-  label: string;
-  error?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="input-label">
-        {label}
-        {required && <span className="text-danger ml-0.5">*</span>}
-      </label>
-      {children}
-      {error && <p className="input-error">{error}</p>}
-    </div>
-  );
-}
+type F = {
+  cod_fiscal: string;
+  denumire: string;
+  numar_de_inregistrare_in_registrul_comertului: string;
+  an_infiintare: number;
+  adresa_sediu_social: string;
+  cod_postal: string;
+  adresa_puncte_de_lucru: { v: string }[];
+  iban: string;
+  telefon: string;
+  email: string;
+  cod_caen_principal: string;
+  coduri_caen_secundare: { v: string }[];
+  numar_angajati: number;
+  capital_social: number;
+  stare: "Activa" | "Radiata" | "Suspendata" | "InInsolventa";
+};
 
-// Dynamic array input (add/remove string items)
-function ArrayField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  readOnly,
-}: {
-  label: string;
-  value: string[];
-  onChange: (v: string[]) => void;
-  placeholder?: string;
-  readOnly?: boolean;
-}) {
-  const add = () => onChange([...value, '']);
-  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
-  const update = (i: number, v: string) => {
-    const next = [...value];
-    next[i] = v;
-    onChange(next);
-  };
-
-  return (
-    <div>
-      <label className="input-label">{label}</label>
-      <div className="space-y-2">
-        {value.map((item, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              value={item}
-              onChange={(e) => update(i, e.target.value)}
-              className="input-field"
-              placeholder={placeholder}
-              readOnly={readOnly}
-            />
-            {!readOnly && (
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="shrink-0 w-8 h-9 flex items-center justify-center text-slate-500 hover:text-danger transition-colors"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        ))}
-        {!readOnly && (
-          <button
-            type="button"
-            onClick={add}
-            className="text-xs text-brand hover:text-brand-dim transition-colors"
-          >
-            + Adaugă
-          </button>
-        )}
-        {value.length === 0 && readOnly && (
-          <span className="text-xs text-slate-500">—</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Form ─────────────────────────────────────────────────────────────────
-
-export function PersoanaJuridicaFormPage() {
-  const { id } = useParams<{ id: string }>();
-  const isEdit = !!id;
+export default function PersoanaJuridicaFormPage() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isReadOnly = user?.role === 'Auditor';
-
-  const [adresePuncteLucru, setAdresePuncteLucru] = useState<string[]>([]);
-  const [codurCaenSecundare, setCodurCaenSecundare] = useState<string[]>([]);
+  const isEdit = !!id && id !== "new";
 
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
-  } = useForm<PersoanaJuridicaFormValues>({
-    resolver: zodResolver(persoanaJuridicaSchema),
-    defaultValues: { stare: 'Activa', numar_angajati: 0, capital_social: 1 },
+    control,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<F>({
+    defaultValues: {
+      stare: "Activa",
+      numar_angajati: 0,
+      capital_social: 1,
+      adresa_puncte_de_lucru: [],
+      coduri_caen_secundare: [],
+    },
   });
+
+  const {
+    fields: puncteF,
+    append: addPunct,
+    remove: rmPunct,
+  } = useFieldArray({ control, name: "adresa_puncte_de_lucru" });
+  const {
+    fields: caenF,
+    append: addCaen,
+    remove: rmCaen,
+  } = useFieldArray({ control, name: "coduri_caen_secundare" });
 
   useEffect(() => {
     if (!isEdit) return;
-    const load = async () => {
-      try {
-        const data = await persoanaJuridicaApi.getById(id);
+    pjGetById(id!)
+      .then((r) =>
         reset({
-          cod_fiscal: data.cod_fiscal,
-          denumire: data.denumire,
+          cod_fiscal: r.cod_fiscal,
+          denumire: r.denumire,
           numar_de_inregistrare_in_registrul_comertului:
-            data.numar_de_inregistrare_in_registrul_comertului,
-          an_infiintare: data.an_infiintare,
-          adresa_sediu_social: data.adresa_sediu_social,
-          cod_postal: data.cod_postal ?? '',
-          iban: data.iban,
-          telefon: data.telefon ?? '',
-          email: data.email ?? '',
-          cod_caen_principal: data.cod_caen_principal,
-          numar_angajati: data.numar_angajati,
-          capital_social: data.capital_social,
-          stare: data.stare,
-          wallet: data.wallet ?? '',
-        });
-        setAdresePuncteLucru(data.adresa_puncte_de_lucru ?? []);
-        setCodurCaenSecundare(data.coduri_caen_secundare ?? []);
-      } catch {
-        toast('Eroare la încărcarea înregistrării', 'error');
-        navigate('/persoane-juridice');
-      }
-    };
-    load();
-  }, [id, isEdit, reset, toast, navigate]);
+            r.numar_de_inregistrare_in_registrul_comertului,
+          an_infiintare: r.an_infiintare,
+          adresa_sediu_social: r.adresa_sediu_social,
+          cod_postal: r.cod_postal ?? "",
+          adresa_puncte_de_lucru: (r.adresa_puncte_de_lucru ?? []).map((v) => ({
+            v,
+          })),
+          iban: r.iban,
+          telefon: r.telefon ?? "",
+          email: r.email ?? "",
+          cod_caen_principal: r.cod_caen_principal,
+          coduri_caen_secundare: (r.coduri_caen_secundare ?? []).map((v) => ({
+            v,
+          })),
+          numar_angajati: r.numar_angajati,
+          capital_social: r.capital_social,
+          stare: r.stare,
+        }),
+      )
+      .catch(() => {
+        toast("Eroare la încărcare.", "err");
+        navigate("/persoane-juridice");
+      });
+  }, [id, isEdit]);
 
-  const onSubmit = async (values: PersoanaJuridicaFormValues) => {
-    const payload = {
-      ...values,
-      adresa_puncte_de_lucru: adresePuncteLucru.filter(Boolean),
-      coduri_caen_secundare: codurCaenSecundare.filter(Boolean),
+  const onSubmit = async (v: F) => {
+    const body = {
+      ...v,
+      cod_postal: v.cod_postal || null,
+      telefon: v.telefon || null,
+      email: v.email || null,
+      adresa_puncte_de_lucru: v.adresa_puncte_de_lucru
+        .map((x) => x.v)
+        .filter(Boolean),
+      coduri_caen_secundare: v.coduri_caen_secundare
+        .map((x) => x.v)
+        .filter(Boolean),
     };
     try {
       if (isEdit) {
-        await persoanaJuridicaApi.update(id, payload);
-        toast('Înregistrare actualizată cu succes', 'success');
+        await pjUpdate(id!, body);
+        toast("Persoană juridică actualizată cu succes.", "ok");
       } else {
-        await persoanaJuridicaApi.create(payload);
-        toast('Înregistrare creată cu succes', 'success');
+        await pjCreate(body);
+        toast("Persoană juridică creată cu succes.", "ok");
       }
-      navigate('/persoane-juridice');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Eroare la salvarea datelor';
-      toast(msg, 'error');
+      navigate("/persoane-juridice");
+    } catch (e: any) {
+      const errorMsg =
+        e?.response?.data?.error ??
+        e?.response?.data?.details ??
+        "Eroare la salvare.";
+      toast(errorMsg, "err");
     }
   };
 
-  const e = errors;
-
   return (
     <AppLayout>
-      <div className="p-8 max-w-3xl">
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => navigate('/persoane-juridice')}
-            className="text-slate-400 hover:text-white transition-colors text-sm"
+      <div className="p-8 max-w-4xl mx-auto fade-up">
+        <PageHeader
+          title={
+            isEdit ? "Editare Persoană Juridică" : "Adaugare Persoană Juridică"
+          }
+          subtitle={isEdit ? `ID: ${id}` : undefined}
+        />
+
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="rounded-xl border p-8"
+          style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+        >
+          {/* ── Identificare ── */}
+          <div
+            className="mb-8 pb-8 border-b"
+            style={{ borderColor: "var(--border)" }}
           >
-            ← Înapoi
-          </button>
-          <div>
-            <h1 className="font-display text-2xl text-white">
-              {isEdit ? 'Editare Persoană Juridică' : 'Persoană Juridică Nouă'}
-            </h1>
-            {isReadOnly && (
-              <p className="text-xs text-warning mt-0.5">Vizualizare (mod auditor)</p>
-            )}
-          </div>
-        </div>
+            <h3
+              className="text-sm font-semibold uppercase tracking-wider mb-6"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Identificare Entitate
+            </h3>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Identificare */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Identificare
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cod Fiscal (CIF)" error={e.cod_fiscal?.message} required>
-                <input
-                  {...register('cod_fiscal')}
-                  className="input-field font-mono"
-                  placeholder="12345678"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field
-                label="Nr. Registrul Comerțului"
-                error={e.numar_de_inregistrare_in_registrul_comertului?.message}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField
+                label="CIF"
                 required
+                error={errors.cod_fiscal?.message}
               >
-                <input
-                  {...register('numar_de_inregistrare_in_registrul_comertului')}
-                  className="input-field font-mono"
-                  placeholder="J40/123456/24"
-                  readOnly={isReadOnly}
+                <Input
+                  {...register("cod_fiscal", { required: "Obligatoriu" })}
+                  placeholder="RO12345678"
+                  error={!!errors.cod_fiscal}
                 />
-              </Field>
-            </div>
-            <Field label="Denumire" error={e.denumire?.message} required>
-              <input
-                {...register('denumire')}
-                className="input-field"
-                placeholder="SC Exemplu SRL"
-                readOnly={isReadOnly}
-              />
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="An înființare" error={e.an_infiintare?.message} required>
-                <input
-                  {...register('an_infiintare', { valueAsNumber: true })}
-                  type="number"
-                  className="input-field"
-                  placeholder="2010"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Stare" error={e.stare?.message}>
-                <select {...register('stare')} className="input-field" disabled={isReadOnly}>
-                  <option value="Activa">Activă</option>
-                  <option value="Radiata">Radiată</option>
-                  <option value="Suspendata">Suspendată</option>
-                  <option value="InInsolventa">În Insolvență</option>
-                </select>
-              </Field>
-            </div>
-          </fieldset>
+              </FormField>
 
-          {/* Activitate */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Activitate
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cod CAEN principal" error={e.cod_caen_principal?.message} required>
-                <input
-                  {...register('cod_caen_principal')}
-                  className="input-field font-mono"
-                  placeholder="6201"
-                  maxLength={4}
-                  readOnly={isReadOnly}
+              <FormField
+                label="Nr. Reg. Com."
+                required
+                error={
+                  errors.numar_de_inregistrare_in_registrul_comertului?.message
+                }
+              >
+                <Input
+                  {...register(
+                    "numar_de_inregistrare_in_registrul_comertului",
+                    {
+                      required: "Obligatoriu",
+                    },
+                  )}
+                  placeholder="J40/1234/2020"
+                  error={!!errors.numar_de_inregistrare_in_registrul_comertului}
                 />
-              </Field>
-              <Field label="Nr. angajați" error={e.numar_angajati?.message} required>
-                <input
-                  {...register('numar_angajati', { valueAsNumber: true })}
+              </FormField>
+            </div>
+
+            <FormField
+              label="Denumire"
+              required
+              error={errors.denumire?.message}
+            >
+              <Input
+                {...register("denumire", { required: "Obligatoriu" })}
+                placeholder="S.R.L. Example Company"
+                error={!!errors.denumire}
+              />
+            </FormField>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField
+                label="An înființare"
+                required
+                error={errors.an_infiintare?.message}
+              >
+                <Input
+                  type="number"
+                  {...register("an_infiintare", {
+                    valueAsNumber: true,
+                    required: "Obligatoriu",
+                  })}
+                  error={!!errors.an_infiintare}
+                />
+              </FormField>
+
+              <FormField label="Stare" required error={errors.stare?.message}>
+                <Select
+                  {...register("stare")}
+                  options={[
+                    { value: "Activa", label: "Activă" },
+                    { value: "Radiata", label: "Radiată" },
+                    { value: "Suspendata", label: "Suspendată" },
+                    { value: "InInsolventa", label: "În insolvență" },
+                  ]}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* ── Adresă & Contact ── */}
+          <div
+            className="mb-8 pb-8 border-b"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <h3
+              className="text-sm font-semibold uppercase tracking-wider mb-6"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Adresă & Contact
+            </h3>
+
+            <FormField
+              label="Adresa sediu social"
+              required
+              error={errors.adresa_sediu_social?.message}
+            >
+              <Input
+                {...register("adresa_sediu_social", {
+                  required: "Obligatoriu",
+                })}
+                placeholder="Str. Principale, nr. 123"
+                error={!!errors.adresa_sediu_social}
+              />
+            </FormField>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField label="Cod Poștal" error={errors.cod_postal?.message}>
+                <Input
+                  {...register("cod_postal")}
+                  placeholder="012345"
+                  maxLength={6}
+                  error={!!errors.cod_postal}
+                />
+              </FormField>
+
+              <FormField label="Telefon" error={errors.telefon?.message}>
+                <Input
+                  {...register("telefon")}
+                  placeholder="+40 700 000 000"
+                  type="tel"
+                  error={!!errors.telefon}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Email" error={errors.email?.message}>
+              <Input
+                type="email"
+                {...register("email")}
+                placeholder="contact@example.com"
+                error={!!errors.email}
+              />
+            </FormField>
+
+            <FormField label="IBAN" required error={errors.iban?.message}>
+              <Input
+                {...register("iban", { required: "Obligatoriu" })}
+                placeholder="ROXX XXXX XXXX XXXX XXXX XXXX"
+                className="font-mono"
+                error={!!errors.iban}
+              />
+            </FormField>
+
+            {/* Puncte de Lucru */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Puncte de lucru (sucursale)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => addPunct({ v: "" })}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors"
+                  style={{
+                    color: "var(--amber)",
+                    borderColor: "var(--amber-dim)",
+                  }}
+                >
+                  + Adaugă
+                </button>
+              </div>
+              <div className="space-y-2">
+                {puncteF.map((f, i) => (
+                  <div key={f.id} className="flex gap-2">
+                    <Input
+                      {...register(`adresa_puncte_de_lucru.${i}.v`)}
+                      placeholder="Adresa sucursale"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => rmPunct(i)}
+                      className="px-3 py-2 rounded-lg border transition-colors"
+                      style={{
+                        color: "var(--red)",
+                        borderColor: "var(--red-dim)",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Activitate Economică ── */}
+          <div
+            className="mb-8 pb-8 border-b"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <h3
+              className="text-sm font-semibold uppercase tracking-wider mb-6"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Activitate Economică
+            </h3>
+
+            <FormField
+              label="Cod CAEN principal"
+              required
+              error={errors.cod_caen_principal?.message}
+            >
+              <Input
+                {...register("cod_caen_principal", {
+                  required: "Obligatoriu",
+                })}
+                placeholder="6201"
+                maxLength={4}
+              />
+            </FormField>
+
+            {/* Coduri CAEN secundare */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Coduri CAEN secundare
+                </label>
+                <button
+                  type="button"
+                  onClick={() => addCaen({ v: "" })}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors"
+                  style={{
+                    color: "var(--amber)",
+                    borderColor: "var(--amber-dim)",
+                  }}
+                >
+                  + Adaugă
+                </button>
+              </div>
+              <div className="space-y-2">
+                {caenF.map((f, i) => (
+                  <div key={f.id} className="flex gap-2">
+                    <Input
+                      {...register(`coduri_caen_secundare.${i}.v`)}
+                      placeholder="Cod CAEN"
+                      maxLength={4}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => rmCaen(i)}
+                      className="px-3 py-2 rounded-lg border transition-colors"
+                      style={{
+                        color: "var(--red)",
+                        borderColor: "var(--red-dim)",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField
+                label="Nr. angajați"
+                required
+                error={errors.numar_angajati?.message}
+              >
+                <Input
                   type="number"
                   min={0}
-                  className="input-field"
-                  readOnly={isReadOnly}
+                  {...register("numar_angajati", { valueAsNumber: true })}
+                  error={!!errors.numar_angajati}
                 />
-              </Field>
-              <Field label="Capital social (RON)" error={e.capital_social?.message} required>
-                <input
-                  {...register('capital_social', { valueAsNumber: true })}
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  className="input-field"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-            </div>
-            <ArrayField
-              label="Coduri CAEN secundare"
-              value={codurCaenSecundare}
-              onChange={setCodurCaenSecundare}
-              placeholder="6202"
-              readOnly={isReadOnly}
-            />
-          </fieldset>
+              </FormField>
 
-          {/* Contact & Adresă */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Contact & Adresă
-            </legend>
-            <Field label="Adresă sediu social" error={e.adresa_sediu_social?.message} required>
-              <input
-                {...register('adresa_sediu_social')}
-                className="input-field"
-                placeholder="Str. Exemplu, nr. 1, București"
-                readOnly={isReadOnly}
-              />
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cod poștal" error={e.cod_postal?.message}>
-                <input
-                  {...register('cod_postal')}
-                  className="input-field"
-                  placeholder="010101"
-                  maxLength={6}
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Telefon" error={e.telefon?.message}>
-                <input
-                  {...register('telefon')}
-                  className="input-field"
-                  placeholder="+40212345678"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-              <Field label="Email" error={e.email?.message}>
-                <input
-                  {...register('email')}
-                  type="email"
-                  className="input-field"
-                  placeholder="contact@firma.ro"
-                  readOnly={isReadOnly}
-                />
-              </Field>
-            </div>
-            <ArrayField
-              label="Adrese puncte de lucru"
-              value={adresePuncteLucru}
-              onChange={setAdresePuncteLucru}
-              placeholder="Str. Secundară, nr. 2, Cluj"
-              readOnly={isReadOnly}
-            />
-          </fieldset>
-
-          {/* Financiar */}
-          <fieldset className="card p-5 space-y-4">
-            <legend className="text-xs text-slate-500 uppercase tracking-wider mb-4 px-1">
-              Financiar & Web3
-            </legend>
-            <Field label="IBAN" error={e.iban?.message} required>
-              <input
-                {...register('iban')}
-                className="input-field font-mono"
-                placeholder="RO49AAAA1B31007593840000"
-                readOnly={isReadOnly}
-              />
-            </Field>
-            <Field label="Adresă Wallet" error={e.wallet?.message}>
-              <input
-                {...register('wallet')}
-                className="input-field font-mono text-xs"
-                placeholder="0x... (opțional)"
-                readOnly={isReadOnly}
-              />
-            </Field>
-          </fieldset>
-
-          {!isReadOnly && (
-            <div className="flex items-center gap-3">
-              <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
-                    Se salvează...
-                  </span>
-                ) : isEdit ? (
-                  'Salvează modificările'
-                ) : (
-                  'Creează înregistrarea'
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => navigate('/persoane-juridice')}
+              <FormField
+                label="Capital social (RON)"
+                required
+                error={errors.capital_social?.message}
               >
-                Anulează
-              </button>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  {...register("capital_social", { valueAsNumber: true })}
+                  error={!!errors.capital_social}
+                />
+              </FormField>
             </div>
-          )}
+          </div>
+
+          {/* ── Actions ── */}
+          <div
+            className="flex items-center gap-3 pt-6 border-t"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSubmitting}
+              disabled={!isDirty}
+            >
+              {isEdit ? "Actualizează" : "Crează"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate("/persoane-juridice")}
+              disabled={isSubmitting}
+            >
+              Anulează
+            </Button>
+          </div>
         </form>
       </div>
     </AppLayout>

@@ -10,6 +10,7 @@
 *.swo
 *~
 .DS_Store
+docs
 
 # Client (Node.js/JavaScript/TypeScript)
 /client/node_modules/
@@ -51,3 +52,14 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+/server/.env
+/server/zk_keys/
+/server/.env.local
+/client/.env
+/client/.env.local
+CLAUDE.md
+
+# Foundry
+/contracts/out/
+/contracts/cache/
+/contracts/.env
