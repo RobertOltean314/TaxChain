@@ -101,11 +101,16 @@ export default function AuditorPage() {
     }
   };
 
-  // Show only ZK proofs that carry a full versioned fingerprint ("pf_v2_XXXXXXXX" / "pj_v2_XXXXXXXX").
-  // Proofs with NULL or the bare label ("pf_v2") were generated before key-fingerprinting was
-  // introduced and cannot be reliably verified — hide them. Non-ZK proofs are always shown.
-  const hasFingerprint = (cv: string | null | undefined) =>
-    cv != null && (cv.startsWith("pf_v2_") || cv.startsWith("pj_v2_"));
+  // Show only ZK proofs that carry a full versioned fingerprint (e.g. "pf_v2_XXXXXXXX", "pj_v3_XXXXXXXX").
+  // Format: "{label}_{8-char hex}" — at least two underscore-separated segments with a hex suffix.
+  // Proofs with NULL or a bare label ("pf_v2") were generated before key-fingerprinting and are hidden.
+  // Non-ZK proofs are always shown.
+  const hasFingerprint = (cv: string | null | undefined) => {
+    if (cv == null) return false;
+    const parts = cv.split("_");
+    const hex = parts[parts.length - 1];
+    return parts.length >= 3 && /^[0-9a-f]{8}$/.test(hex);
+  };
   const currentProofs = proofs.filter(
     (p) => !p.is_zk || hasFingerprint(p.circuit_version),
   );

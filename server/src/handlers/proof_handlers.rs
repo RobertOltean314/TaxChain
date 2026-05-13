@@ -184,8 +184,11 @@ async fn resolve_entity_info(
 
 /// Scale a Decimal (RON) to u64 cents for the ZK circuit (multiply by 100, truncate).
 fn to_scaled_u64(d: Decimal) -> u64 {
-    let scaled = (d.abs() * Decimal::new(100, 0)).floor();
-    // Convert via string to avoid needing ToPrimitive feature
+    // Scale by 20000 (= 100 × 200) instead of 100.
+    // Any amount with ≤ 2 decimal places becomes an exact multiple of 200,
+    // which satisfies the circuit's divisibility requirements for 25 %, 10 %,
+    // and the compound 10 %-of-65 % (impozit venit) constraints simultaneously.
+    let scaled = (d.abs() * Decimal::new(20000, 0)).floor();
     scaled.to_string().parse::<u64>().unwrap_or(0)
 }
 
@@ -446,6 +449,15 @@ pub async fn generate_zk_proof(
             Err(r) => return r,
         };
 
+    // Round to 2dp to match DB storage NUMERIC(14,2).
+    // During verification we read these 2dp values back and recompute derived
+    // amounts (cas, cass, iv) with the same Decimal arithmetic — so they produce
+    // the exact same scaled integers as generation.
+    let venituri_brute = venituri_brute.round_dp(2);
+    let cheltuieli_brute = cheltuieli_brute.round_dp(2);
+    let vat_colectat = vat_colectat.round_dp(2);
+    let vat_deductibil = vat_deductibil.round_dp(2);
+
     // ── Build per-invoice arrays for ZK circuit ──────────────────────────────
     let invoice_rows = match report_svc
         .invoice_amounts_for_zk(&ctx.entity_type, ctx.entity_id, from, to)
@@ -517,9 +529,9 @@ pub async fn generate_zk_proof(
         let (c, cs, iv, total) = compute_pf_taxes_zk(profit_net, vat_net);
         (c, cs, iv, Decimal::ZERO, total)
     } else {
-        // SRL: 16% flat profit tax (standard rate; micro-enterprise rate excluded
-        // because it uses revenue as base — non-linear for the circuit)
-        let ip = profit_net * Decimal::new(16, 2);
+        // SRL micro-enterprise: 3% of net revenue (CA fără TVA).
+        // This is a simple linear constraint expressible in R1CS.
+        let ip = (venituri_brute - vat_colectat) * Decimal::new(3, 2);
         let total = ip + vat_net.max(Decimal::ZERO);
         (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO, ip, total)
     };
@@ -770,11 +782,18 @@ pub async fn verify_proof(
     let cheltuieli_scaled = to_scaled_u64(proof.cheltuieli_brute);
     let vat_col_scaled = to_scaled_u64(proof.vat_colectat);
     let vat_ded_scaled = to_scaled_u64(proof.vat_deductibil);
+    // DB stores NUMERIC(14,2); these are already 2dp so subtraction is exact.
     let profit_net = proof.venituri_brute - proof.vat_colectat
         - (proof.cheltuieli_brute - proof.vat_deductibil);
     let profit_scaled = to_scaled_u64(profit_net);
+    let vat_net_v = proof.vat_colectat - proof.vat_deductibil;
 
+    // Recompute derived tax amounts from profit_net using the same Decimal
+    // arithmetic as generation — do NOT read proof.cas/cass/iv from DB, because
+    // the DB rounds to 2dp (e.g. cass=12322.676→12322.68) which gives a different
+    // scaled integer than the exact intermediate value used when proving.
     let result = if proof.entity_type == "PF" {
+        let (cas_r, cass_r, iv_r, _) = compute_pf_taxes_zk(profit_net, vat_net_v);
         zk_svc.verify_pf_proof(
             &bytes,
             venituri_scaled,
@@ -782,11 +801,12 @@ pub async fn verify_proof(
             vat_col_scaled,
             vat_ded_scaled,
             profit_scaled,
-            to_scaled_u64(proof.cas),
-            to_scaled_u64(proof.cass),
-            to_scaled_u64(proof.impozit_venit),
+            to_scaled_u64(cas_r),
+            to_scaled_u64(cass_r),
+            to_scaled_u64(iv_r),
         )
     } else {
+        let ip = (proof.venituri_brute - proof.vat_colectat) * Decimal::new(3, 2);
         zk_svc.verify_pj_proof(
             &bytes,
             venituri_scaled,
@@ -794,7 +814,7 @@ pub async fn verify_proof(
             vat_col_scaled,
             vat_ded_scaled,
             profit_scaled,
-            to_scaled_u64(proof.impozit_profit),
+            to_scaled_u64(ip),
         )
     };
 

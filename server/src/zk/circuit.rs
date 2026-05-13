@@ -273,7 +273,7 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for PJTaxCircuit<F> {
         let expense_base_sum = sum_vars(&expense_base_vars);
         let expense_vat_sum = sum_vars(&expense_vat_vars);
 
-        let c16 = FpVar::constant(F::from(16u64));
+        let c3   = FpVar::constant(F::from(3u64));
         let c100 = FpVar::constant(F::from(100u64));
 
         // 1–4: VAT constraints (identical to PF)
@@ -283,8 +283,10 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for PJTaxCircuit<F> {
         expense_vat_sum.enforce_equal(&vat_ded_var)?;
         // 5. Σ income_bases − Σ expense_bases == profit_net
         (income_base_sum - expense_base_sum).enforce_equal(&profit_var)?;
-        // 6. profit_net × 16 == impozit_profit × 100  (proves tax = 16% of profit)
-        (profit_var * &c16).enforce_equal(&(ip_var * &c100))?;
+        // 6. (venituri_brute − vat_colectat) × 3 == impozit_profit × 100
+        //    proves micro-enterprise tax = 3% of net revenue (CA fără TVA)
+        let venituri_nete_var = venituri_var - vat_col_var;
+        (venituri_nete_var * &c3).enforce_equal(&(ip_var * &c100))?;
 
         Ok(())
     }

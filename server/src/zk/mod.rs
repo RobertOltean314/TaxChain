@@ -16,11 +16,11 @@ use circuit::{PFTaxCircuit, PJTaxCircuit};
 
 const PF_PROVING_KEY: &str = "zk_keys/pf_proving.key";
 const PF_VERIFYING_KEY: &str = "zk_keys/pf_verifying.key";
-const PJ_PROVING_KEY: &str = "zk_keys/pj_proving.key";
-const PJ_VERIFYING_KEY: &str = "zk_keys/pj_verifying.key";
+const PJ_PROVING_KEY: &str = "zk_keys/pj_v3_proving.key";
+const PJ_VERIFYING_KEY: &str = "zk_keys/pj_v3_verifying.key";
 
 pub const PF_CIRCUIT_LABEL: &str = "pf_v2";
-pub const PJ_CIRCUIT_LABEL: &str = "pj_v2";
+pub const PJ_CIRCUIT_LABEL: &str = "pj_v3";
 
 #[derive(Clone)]
 pub struct ZkService {

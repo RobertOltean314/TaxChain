@@ -8,7 +8,16 @@
       "Bash(cargo test *)",
       "Bash(grep -E \"^test |FAILED|passed|failed|ok$|FAILED$\")",
       "Read(//home/robert/Desktop/work/programming/university/**)",
-      "Bash(curl -sk --max-time 8 \"https://www.bnr.ro/nbrfxrates.xml\")"
+      "Bash(curl -sk --max-time 8 \"https://www.bnr.ro/nbrfxrates.xml\")",
+      "Bash(python3 -c \"import reportlab; print\\('reportlab ok'\\)\")",
+      "Bash(python3 -c \"from fpdf import FPDF; print\\('fpdf ok'\\)\")",
+      "Bash(python3 -m pip list)",
+      "Bash(pip install *)",
+      "Bash(python3 -c \"from fpdf import FPDF; print\\('ok'\\)\")",
+      "Bash(python3)",
+      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff --stat HEAD)",
+      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff HEAD -- server/src/handlers/proof_handlers.rs)",
+      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff HEAD -- server/src/zk/circuit.rs server/src/zk/mod.rs)"
     ]
   }
 }
