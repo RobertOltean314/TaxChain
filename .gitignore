@@ -63,3 +63,11 @@ CLAUDE.md
 /contracts/out/
 /contracts/cache/
 /contracts/.env
+/contracts/lib/
+
+# TypeScript build artifacts
+*.tsbuildinfo
+
+# Documents & generated files
+*.docx
+*.pdf
