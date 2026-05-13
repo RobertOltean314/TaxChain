@@ -17,7 +17,11 @@
       "Bash(python3)",
       "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff --stat HEAD)",
       "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff HEAD -- server/src/handlers/proof_handlers.rs)",
-      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff HEAD -- server/src/zk/circuit.rs server/src/zk/mod.rs)"
+      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff HEAD -- server/src/zk/circuit.rs server/src/zk/mod.rs)",
+      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff HEAD -- client/src/pages/AuditorPage.tsx)",
+      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain diff -- client/src/pages/AuditorPage.tsx)",
+      "Bash(git -C /home/robert/Desktop/work/programming/university/taxchain status --short)",
+      "Bash(fc-list)"
     ]
   }
 }
